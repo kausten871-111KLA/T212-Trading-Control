@@ -1,0 +1,6 @@
+name = "t212-trading-control"
+main = "src/index.js"
+compatibility_date = "2026-08-27"
+
+# Phase 1 intentionally contains no Trading 212 credentials.
+# Add T212_API_KEY and T212_API_SECRET as Cloudflare Worker secrets only.
