@@ -1,0 +1,10 @@
+name = "t212-trading-control"
+main = "src/index.js"
+compatibility_date = "2026-08-27"
+
+[[d1_databases]]
+binding = "T212_DB"
+database_name = "t212-order-control"
+database_id = "REPLACE_WITH_REAL_D1_DATABASE_ID"
+
+# Execution also requires the T212_APPROVER_TOKEN secret.
