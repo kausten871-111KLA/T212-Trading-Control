@@ -2,7 +2,7 @@ name = "t212-trading-control"
 main = "src/index.js"
 compatibility_date = "2026-08-27"
 
-# Phase 1 intentionally contains no Trading 212 credentials.
-# Configure these as Cloudflare Worker secrets only:
-#   T212_DEMO_API_KEY
-#   T212_DEMO_API_SECRET
+# Safe deployable configuration: no order database is bound, so execution remains locked.
+# Store only as Worker secrets: T212_DEMO_API_KEY, T212_DEMO_API_SECRET, T212_AGENT_TOKEN.
+# Add the D1 binding from wrangler.execution.example.toml only after security and approval gates pass.
+
