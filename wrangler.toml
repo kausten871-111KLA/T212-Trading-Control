@@ -2,7 +2,13 @@ name = "t212-trading-control"
 main = "src/index.js"
 compatibility_date = "2026-08-27"
 
-# Phase 1 intentionally contains no Trading 212 credentials.
-# Configure these as Cloudflare Worker secrets only:
+# Bind a KV namespace named T212_ORDER_GUARD before enabling order submission.
+# Store these only as Cloudflare Worker secrets:
 #   T212_DEMO_API_KEY
 #   T212_DEMO_API_SECRET
+#   T212_CONTROL_TOKEN
+
+[[kv_namespaces]]
+binding = "T212_ORDER_GUARD"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
