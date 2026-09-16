@@ -6,6 +6,7 @@ function json(body, status = 200) {
 }
 
 function credentialsConfigured(env) { return Boolean(env.T212_DEMO_API_KEY && env.T212_DEMO_API_SECRET); }
+function readConfigured(env) { return Boolean(env.T212_AGENT_TOKEN); }
 function executionConfigured(env) { return Boolean(env.T212_AGENT_TOKEN && env.T212_APPROVER_TOKEN && env.T212_DB); }
 function bearer(request) { const value = request.headers.get("authorization") || ""; return value.startsWith("Bearer ") ? value.slice(7) : ""; }
 function authorised(request, env, role) { const token = role === "approver" ? env.T212_APPROVER_TOKEN : env.T212_AGENT_TOKEN; return Boolean(token) && bearer(request) === token; }
@@ -128,9 +129,10 @@ async function handleRead(request, env, url) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, service: "T212 Trading Control - Phase 3", environment: "Trading 212 Demo", credentialsConfigured: credentialsConfigured(env), executionConfigured: executionConfigured(env), executionEnabled: credentialsConfigured(env) && executionConfigured(env) });
-    if (!credentialsConfigured(env) || !executionConfigured(env)) return json({ ok: false, error: "Demo credentials or execution controls are not configured.", executionEnabled: false }, 503);
-    if (request.method === "GET") { const match = url.pathname.match(/^\/t212\/proposals\/([^/]+)\/verify$/); if (match) return handleVerify(request, env, match[1]); return handleRead(request, env, url); }
+    if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, service: "T212 Trading Control - Phase 3", environment: "Trading 212 Demo", credentialsConfigured: credentialsConfigured(env), readConfigured: readConfigured(env), executionConfigured: executionConfigured(env), executionEnabled: credentialsConfigured(env) && executionConfigured(env) });
+    if (!credentialsConfigured(env) || !readConfigured(env)) return json({ ok: false, error: "Demo credentials or read controls are not configured.", executionEnabled: false }, 503);
+    if (request.method === "GET") { const match = url.pathname.match(/^\/t212\/proposals\/([^/]+)\/verify$/); if (match) { if (!executionConfigured(env)) return json({ ok: false, error: "Execution controls are not configured.", executionEnabled: false }, 503); return handleVerify(request, env, match[1]); } return handleRead(request, env, url); }
+    if (!executionConfigured(env)) return json({ ok: false, error: "Execution controls are not configured.", executionEnabled: false }, 503);
     if (request.method === "POST" && url.pathname === "/t212/proposals") return handlePrepare(request, env);
     if (request.method === "POST") { const match = url.pathname.match(/^\/t212\/proposals\/([^/]+)\/(approve|execute)$/); if (match?.[2] === "approve") return handleApprove(request, env, match[1]); if (match?.[2] === "execute") return handleExecute(request, env, match[1]); }
     return json({ ok: false, error: "Method or route not allowed." }, 405);
