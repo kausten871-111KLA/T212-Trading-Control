@@ -49,6 +49,12 @@ const env = {
   T212_DB: new FakeD1(),
 };
 
+const readOnlyEnv = {
+  T212_DEMO_API_KEY: "demo-key",
+  T212_DEMO_API_SECRET: "demo-secret",
+  T212_AGENT_TOKEN: "agent-token",
+};
+
 let postCount = 0;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (url, init = {}) => {
@@ -65,6 +71,15 @@ const asJson = (headers, body) => ({ method: "POST", headers: { ...headers, "Con
 const health = await worker.fetch(new Request("https://worker.test/health"), env);
 assert.equal(health.status, 200);
 assert.equal((await health.json()).executionEnabled, true);
+
+const lockedHealth = await worker.fetch(new Request("https://worker.test/health"), readOnlyEnv);
+assert.equal((await lockedHealth.json()).executionEnabled, false);
+
+const lockedRead = await worker.fetch(new Request("https://worker.test/t212/test", { headers: agent }), readOnlyEnv);
+assert.equal(lockedRead.status, 200);
+
+const lockedWrite = await worker.fetch(new Request("https://worker.test/t212/proposals", asJson(agent, { environment: "demo", ticker: "AAPL_US_EQ", quantity: 0.01 })), readOnlyEnv);
+assert.equal(lockedWrite.status, 503);
 
 const denied = await worker.fetch(new Request("https://worker.test/t212/test"), env);
 assert.equal(denied.status, 401);
