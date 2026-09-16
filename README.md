@@ -38,10 +38,10 @@ Authenticated with the human-only `T212_APPROVER_TOKEN`:
 
 ## Required Cloudflare configuration
 
-1. Create a D1 database named `t212-order-control` and apply `migrations/0001_proposals.sql`.
-2. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.toml` with its database ID.
-3. Add Worker secrets `T212_DEMO_API_KEY`, `T212_DEMO_API_SECRET`, `T212_AGENT_TOKEN` and a separate `T212_APPROVER_TOKEN`.
-4. Protect `/t212/*` with Cloudflare Access/MFA and deploy only after Trading 212 has confirmed the intended customised-interface use is permitted.
+1. Deploy the default `wrangler.toml` first. It contains no D1 binding, so order execution is locked while read-only authentication is tested.
+2. Add Worker secrets `T212_DEMO_API_KEY`, `T212_DEMO_API_SECRET` and `T212_AGENT_TOKEN`.
+3. Protect `/t212/*` with Cloudflare Access/MFA and verify the read routes.
+4. Only after Trading 212 confirms the intended customised-interface use is permitted, create D1, apply `migrations/0001_proposals.sql`, copy the binding from `wrangler.execution.example.toml` with the real database ID, and add the separate `T212_APPROVER_TOKEN` secret.
 5. Call `/health`; both `credentialsConfigured` and `executionConfigured` must be `true`.
 6. Call `/t212/test`, `/t212/instruments`, `/t212/orders` and `/t212/positions` before any write.
 
