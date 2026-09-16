@@ -2,11 +2,7 @@ name = "t212-trading-control"
 main = "src/index.js"
 compatibility_date = "2026-08-27"
 
-[[d1_databases]]
-binding = "T212_DB"
-database_name = "t212-order-control"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
-
-# Store only as Worker secrets:
-# T212_DEMO_API_KEY, T212_DEMO_API_SECRET, T212_AGENT_TOKEN, T212_APPROVER_TOKEN
+# Safe deployable configuration: no order database is bound, so execution remains locked.
+# Store only as Worker secrets: T212_DEMO_API_KEY, T212_DEMO_API_SECRET, T212_AGENT_TOKEN.
+# Add the D1 binding from wrangler.execution.example.toml only after security and approval gates pass.
 
