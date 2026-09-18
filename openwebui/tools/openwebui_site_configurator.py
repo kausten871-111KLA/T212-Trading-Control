@@ -2,7 +2,7 @@
 title: Open WebUI Site Configurator
 author: Katie / OpenAI
 description: Local Open WebUI workspace audit and additive configuration tool. Uses a server-side Open WebUI API key.
-version: 0.1.0
+version: 0.2.0
 """
 
 import os
@@ -147,6 +147,149 @@ class Tools:
             json_body=payload,
         )
         return error or self._show(data)
+
+
+    async def install_or_update_skill_from_github(
+        self,
+        skill_id: str,
+        name: str,
+        description: str,
+        raw_url: str,
+    ) -> str:
+        """
+        Install or update one Open WebUI Skill directly from the project's public GitHub raw URL.
+        Only the kausten871-111KLA/T212-Trading-Control repository is allowed.
+        Audit-first behavior: checks whether the skill already exists, then creates or updates it.
+        """
+        allowed_prefix = (
+            "https://raw.githubusercontent.com/"
+            "kausten871-111KLA/T212-Trading-Control/"
+        )
+        if not raw_url.startswith(allowed_prefix):
+            return "Blocked: raw_url is outside the approved T212-Trading-Control GitHub repository."
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                source = await client.get(raw_url)
+                source.raise_for_status()
+                content = source.text
+        except Exception as exc:
+            return f"Failed to fetch GitHub skill source: {type(exc).__name__}: {exc}"
+
+        payload = {
+            "id": skill_id,
+            "name": name,
+            "description": description,
+            "content": content,
+            "meta": {"tags": ["managed-by-configurator"]},
+            "is_active": True,
+            "access_grants": [],
+        }
+
+        existing, error = await self._request(
+            "GET",
+            f"/api/v1/skills/id/{skill_id}",
+        )
+
+        if error and "404" not in error:
+            return error
+
+        if existing:
+            data, error = await self._request(
+                "POST",
+                f"/api/v1/skills/id/{skill_id}/update",
+                json_body=payload,
+            )
+            action = "updated"
+        else:
+            data, error = await self._request(
+                "POST",
+                "/api/v1/skills/create",
+                json_body=payload,
+            )
+            action = "created"
+
+        if error:
+            return error
+
+        return self._show({
+            "ok": True,
+            "action": action,
+            "skill_id": skill_id,
+            "name": name,
+        })
+
+    async def install_or_update_tool_from_github(
+        self,
+        tool_id: str,
+        name: str,
+        description: str,
+        raw_url: str,
+    ) -> str:
+        """
+        Install or update one local Open WebUI Python Tool from the project's public GitHub raw URL.
+        Only the kausten871-111KLA/T212-Trading-Control repository is allowed.
+        Use only for reviewed project tools. This executes Python inside Open WebUI when installed.
+        """
+        allowed_prefix = (
+            "https://raw.githubusercontent.com/"
+            "kausten871-111KLA/T212-Trading-Control/"
+        )
+        if not raw_url.startswith(allowed_prefix):
+            return "Blocked: raw_url is outside the approved T212-Trading-Control GitHub repository."
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                source = await client.get(raw_url)
+                source.raise_for_status()
+                content = source.text
+        except Exception as exc:
+            return f"Failed to fetch GitHub tool source: {type(exc).__name__}: {exc}"
+
+        payload = {
+            "id": tool_id,
+            "name": name,
+            "content": content,
+            "meta": {
+                "description": description,
+                "manifest": {},
+                "has_user_valves": False,
+            },
+            "access_grants": [],
+        }
+
+        existing, error = await self._request(
+            "GET",
+            f"/api/v1/tools/id/{tool_id}",
+        )
+
+        if error and "404" not in error and "401" not in error:
+            return error
+
+        if existing:
+            data, error = await self._request(
+                "POST",
+                f"/api/v1/tools/id/{tool_id}/update",
+                json_body=payload,
+            )
+            action = "updated"
+        else:
+            data, error = await self._request(
+                "POST",
+                "/api/v1/tools/create",
+                json_body=payload,
+            )
+            action = "created"
+
+        if error:
+            return error
+
+        return self._show({
+            "ok": True,
+            "action": action,
+            "tool_id": tool_id,
+            "name": name,
+        })
 
     async def list_tools(self) -> str:
         """List current local/OpenAPI/MCP tools without changing them."""
