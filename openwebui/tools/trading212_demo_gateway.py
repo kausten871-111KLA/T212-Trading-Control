@@ -2,7 +2,7 @@
 title: Trading 212 DEMO Gateway
 author: Katie / OpenAI
 description: Single server-side Trading 212 DEMO broker toolkit for DeepSeek/Open WebUI agents.
-version: 0.1.0
+version: 0.2.0
 """
 
 import os
@@ -89,6 +89,7 @@ class Tools:
         return self._show(
             {
                 "environment": "DEMO",
+                "gatewayVersion": "0.2.0",
                 "account": account,
                 "openPositionCount": len(positions),
                 "positions": positions,
@@ -139,6 +140,91 @@ class Tools:
             return f"No T212 DEMO instrument matched '{query}'."
 
         return self._show(matches[:10])
+
+    async def recent_order_history(self, limit: int = 20) -> str:
+        """
+        Return recent historical Trading 212 DEMO orders for audit/reporting.
+        Read-only. Uses the broker history endpoint and returns the first page only.
+        :param limit: Number of recent history records requested, 1-50.
+        :return: Historical DEMO orders as JSON text.
+        """
+        limit = max(1, min(int(limit), 50))
+        data, error = await self._request(
+            "GET",
+            f"/equity/history/orders?limit={limit}",
+        )
+        return error or self._show(data)
+
+    async def recent_transactions(self, limit: int = 20) -> str:
+        """
+        Return recent Trading 212 DEMO cash/account transactions for audit/reporting.
+        Read-only. Uses the broker history endpoint and returns the first page only.
+        :param limit: Number of recent transaction records requested, 1-50.
+        :return: Historical DEMO transactions as JSON text.
+        """
+        limit = max(1, min(int(limit), 50))
+        data, error = await self._request(
+            "GET",
+            f"/equity/history/transactions?limit={limit}",
+        )
+        return error or self._show(data)
+
+    async def operations_dashboard(self, history_limit: int = 20) -> str:
+        """
+        Return a richer read-only Trading Operations dashboard:
+        account, positions, pending orders, recent historical orders and recent transactions.
+        DEMO only; never submits an order.
+        :param history_limit: Number of order/transaction history rows requested, 1-50.
+        :return: Consolidated broker-verified dashboard JSON text.
+        """
+        history_limit = max(1, min(int(history_limit), 50))
+
+        account, error = await self._request("GET", "/equity/account/summary")
+        if error:
+            return error
+
+        positions, error = await self._request("GET", "/equity/positions")
+        if error:
+            return error
+
+        orders, error = await self._request("GET", "/equity/orders")
+        if error:
+            return error
+
+        historical_orders, historical_orders_error = await self._request(
+            "GET",
+            f"/equity/history/orders?limit={history_limit}",
+        )
+
+        transactions, transactions_error = await self._request(
+            "GET",
+            f"/equity/history/transactions?limit={history_limit}",
+        )
+
+        positions = positions if isinstance(positions, list) else []
+        orders = orders if isinstance(orders, list) else []
+
+        return self._show(
+            {
+                "environment": "DEMO",
+                "gatewayVersion": "0.2.0",
+                "account": account,
+                "openPositionCount": len(positions),
+                "positions": positions,
+                "pendingOrderCount": len(orders),
+                "pendingOrders": orders,
+                "recentOrderHistory": historical_orders,
+                "recentOrderHistoryError": historical_orders_error,
+                "recentTransactions": transactions,
+                "recentTransactionsError": transactions_error,
+                "executionEnabled": True,
+                "liveTradingEnabled": False,
+                "note": (
+                    "Broker-verified read-only operational state. "
+                    "History sections are first-page snapshots only."
+                ),
+            }
+        )
 
     async def list_positions(self) -> str:
         """
