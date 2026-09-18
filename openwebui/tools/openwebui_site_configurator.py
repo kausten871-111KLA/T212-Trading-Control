@@ -2,7 +2,7 @@
 title: Open WebUI Site Configurator
 author: Katie / OpenAI
 description: Local Open WebUI workspace audit and additive configuration tool. Uses a server-side Open WebUI API key.
-version: 0.3.1
+version: 0.4.0
 """
 
 import os
@@ -21,6 +21,17 @@ class Tools:
         if isinstance(value, str):
             return value
         return json.dumps(value, indent=2, default=str)
+
+    def _deep_merge(self, base, patch):
+        if not isinstance(base, dict) or not isinstance(patch, dict):
+            return patch
+        merged = dict(base)
+        for key, value in patch.items():
+            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+                merged[key] = self._deep_merge(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
 
     async def _request(self, method, path, json_body=None):
         key = self._key()
@@ -62,6 +73,9 @@ class Tools:
             "tools": "/api/v1/tools/export",
             "skills": "/api/v1/skills/export",
             "knowledge": "/api/v1/knowledge/",
+            "prompts": "/api/v1/prompts/",
+            "user_settings": "/api/v1/users/user/settings?raw=true",
+            "user_variables": "/api/v1/users/user/variables",
         }
         result = {}
         for label, path in endpoints.items():
@@ -446,6 +460,204 @@ class Tools:
             "knowledge_name": knowledge_name,
             "filename": filename,
             "file_id": file_id,
+        })
+
+
+    async def list_prompts(self) -> str:
+        """
+        List reusable Open WebUI Workspace prompts visible to the API-key owner.
+        Read-only.
+        """
+        data, error = await self._request("GET", "/api/v1/prompts/")
+        return error or self._show(data)
+
+    async def install_or_update_prompt_from_github(
+        self,
+        prompt_name: str,
+        command: str,
+        raw_url: str,
+        tags_csv: str = "",
+    ) -> str:
+        """
+        Create or update one reusable Workspace Prompt from the approved project GitHub repository.
+        Additive/specific only: does not delete or bulk-sync other prompts.
+        """
+        allowed_prefix = (
+            "https://raw.githubusercontent.com/"
+            "kausten871-111KLA/T212-Trading-Control/"
+        )
+        if not raw_url.startswith(allowed_prefix):
+            return "Blocked: raw_url is outside the approved T212-Trading-Control GitHub repository."
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                source = await client.get(raw_url)
+                source.raise_for_status()
+                content = source.text
+        except Exception as exc:
+            return f"Failed to fetch GitHub prompt source: {type(exc).__name__}: {exc}"
+
+        prompts, error = await self._request("GET", "/api/v1/prompts/")
+        if error:
+            return error
+
+        existing = None
+        for item in prompts if isinstance(prompts, list) else []:
+            if str(item.get("command", "")).strip() == command.strip():
+                existing = item
+                break
+
+        tags = [tag.strip() for tag in (tags_csv or "").split(",") if tag.strip()]
+        payload = {
+            "command": command.strip(),
+            "name": prompt_name.strip(),
+            "content": content,
+            "data": {},
+            "meta": {"managed_by": "open-webui-site-configurator", "source": raw_url},
+            "tags": tags,
+            "access_grants": [],
+            "is_production": True,
+            "commit_message": "Managed from approved GitHub source",
+        }
+
+        if existing:
+            prompt_id = existing.get("id")
+            if not prompt_id:
+                return f"Existing prompt had no id: {existing}"
+            data, error = await self._request(
+                "POST",
+                f"/api/v1/prompts/id/{prompt_id}/update",
+                json_body=payload,
+            )
+            if error:
+                return error
+            return self._show({
+                "ok": True,
+                "action": "updated",
+                "prompt_id": prompt_id,
+                "command": command,
+                "result": data,
+            })
+
+        data, error = await self._request(
+            "POST",
+            "/api/v1/prompts/create",
+            json_body=payload,
+        )
+        if error:
+            return error
+        return self._show({
+            "ok": True,
+            "action": "created",
+            "command": command,
+            "result": data,
+        })
+
+    async def get_user_settings(self) -> str:
+        """
+        Read the current Open WebUI user/interface settings for the API-key owner.
+        Read-only. Use before any personalisation patch.
+        """
+        data, error = await self._request("GET", "/api/v1/users/user/settings?raw=true")
+        return error or self._show(data)
+
+    async def patch_user_settings(self, patch_json: str) -> str:
+        """
+        Deep-merge a bounded JSON patch into the current user's settings, then save the merged object.
+        Always read current settings first so unrelated fields are preserved.
+        Do not use this for secrets, API keys, model connections, or tool-server credentials.
+        """
+        try:
+            patch = json.loads(patch_json)
+        except Exception as exc:
+            return f"Invalid patch_json: {type(exc).__name__}: {exc}"
+
+        if not isinstance(patch, dict):
+            return "patch_json must decode to a JSON object."
+
+        current, error = await self._request("GET", "/api/v1/users/user/settings?raw=true")
+        if error:
+            return error
+        current = current if isinstance(current, dict) else {}
+
+        blocked_keys = {
+            "api_key", "apikey", "apiKey", "token", "secret", "password",
+            "toolServers", "connections"
+        }
+
+        def contains_blocked(value):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    if key in blocked_keys or str(key).lower() in {
+                        "api_key", "apikey", "token", "secret", "password"
+                    }:
+                        return True
+                    if contains_blocked(child):
+                        return True
+            elif isinstance(value, list):
+                return any(contains_blocked(item) for item in value)
+            return False
+
+        if contains_blocked(patch):
+            return "Blocked: user-settings patch appears to contain connection credentials/secrets/tool-server configuration."
+
+        merged = self._deep_merge(current, patch)
+        data, error = await self._request(
+            "POST",
+            "/api/v1/users/user/settings/update",
+            json_body=merged,
+        )
+        if error:
+            return error
+        return self._show({
+            "ok": True,
+            "action": "user-settings-patched",
+            "result": data,
+        })
+
+    async def get_user_variables(self) -> str:
+        """
+        Read reusable Open WebUI user variables for prompt personalisation.
+        Read-only.
+        """
+        data, error = await self._request("GET", "/api/v1/users/user/variables")
+        return error or self._show(data)
+
+    async def patch_user_variables(self, variables_json: str) -> str:
+        """
+        Add or update non-secret reusable user variables while preserving existing variables.
+        Never store credentials, medical/private records, financial account data, or other secrets here.
+        """
+        try:
+            patch = json.loads(variables_json)
+        except Exception as exc:
+            return f"Invalid variables_json: {type(exc).__name__}: {exc}"
+
+        if not isinstance(patch, dict):
+            return "variables_json must decode to a JSON object."
+
+        current, error = await self._request("GET", "/api/v1/users/user/variables")
+        if error:
+            return error
+        existing = (current or {}).get("variables", {}) if isinstance(current, dict) else {}
+        merged = {**existing, **patch}
+
+        suspicious = ("key", "secret", "token", "password", "credential", "medical", "diagnosis", "account")
+        for key in merged:
+            if any(term in str(key).lower() for term in suspicious):
+                return f"Blocked potentially sensitive user-variable key: {key}"
+
+        data, error = await self._request(
+            "POST",
+            "/api/v1/users/user/variables/update",
+            json_body={"variables": merged},
+        )
+        if error:
+            return error
+        return self._show({
+            "ok": True,
+            "action": "user-variables-patched",
+            "result": data,
         })
 
     async def list_tools(self) -> str:
