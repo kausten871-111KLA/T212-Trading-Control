@@ -25,6 +25,16 @@ If using another working directory, run the script by its full local path.
 ## Read-only acceptance sequence
 Use a fresh **Trading Operations — DeepSeek** chat.
 
+### Test 0 — gateway health check
+Ask:
+> Use the Market Data Gateway health_check with screener probing enabled. Do not trade. Report whether credentials are loaded, whether the market clock works, and whether movers/most-active access is available or plan-blocked.
+
+PASS:
+- credentials are recognised;
+- market clock authenticates;
+- any screener limitation is reported explicitly rather than treated as total gateway failure.
+
+
 ### Test 1 — market clock
 Ask:
 > Use the Market Data Gateway only. Read the US market clock. Do not trade. Report provider, market open/closed state, timestamp, and any API error.
@@ -52,6 +62,16 @@ Ask:
 
 PASS:
 - a candidate set is generated; or exact source/plan errors are surfaced.
+
+### Test 4B — delayed consolidated fallback
+If the real-time SIP screener is plan-blocked, ask:
+> Use scan_symbols with feed delayed_sip on this supplied candidate/watchlist universe. Rank the top gainers and losers. Do not trade.
+
+PASS:
+- the supplied universe is ranked using delayed consolidated data; or
+- the exact feed/subscription error is returned.
+
+This fallback does not replace a broad-market discovery source; it proves the qualification data path still works when Alpaca's real-time SIP screener is unavailable.
 
 ### Test 5 — qualification handoff
 Ask:
