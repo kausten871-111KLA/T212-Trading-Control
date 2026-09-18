@@ -2,7 +2,7 @@
 title: Market Data Gateway
 author: Katie / OpenAI
 description: Read-only US-equity market-data toolkit for DeepSeek/Open WebUI. Alpaca data only; never submits trades. Designed to feed T212 DEMO Scout/Investigator/Decision workflows.
-version: 0.1.0
+version: 0.2.0
 """
 
 import os
@@ -137,6 +137,174 @@ class Tools:
         }
         result.update(self._spread_metrics(latest_quote))
         return result
+
+    async def health_check(self, test_screeners: bool = True) -> str:
+        """
+        Read-only market-data preflight. Confirms credentials are loaded and tests the market clock.
+        Optionally probes Alpaca screener access so plan restrictions are surfaced explicitly.
+        Never places or modifies an order.
+        :param test_screeners: When true, probe movers and most-active endpoints.
+        """
+        headers = self._headers()
+        if not headers:
+            return self._show(
+                {
+                    "provider": "Alpaca",
+                    "readOnly": True,
+                    "credentialsLoaded": False,
+                    "ready": False,
+                    "error": (
+                        "ALPACA_API_KEY / ALPACA_API_SECRET are not available "
+                        "to the Open WebUI server."
+                    ),
+                }
+            )
+
+        clock, clock_error = await self._get(self.trading_base, "/v2/clock")
+
+        movers_error = None
+        actives_error = None
+        if test_screeners:
+            _, movers_error = await self._get(
+                self.data_base,
+                "/v1beta1/screener/stocks/movers",
+                params={"top": 1},
+            )
+            _, actives_error = await self._get(
+                self.data_base,
+                "/v1beta1/screener/stocks/most-actives",
+                params={"top": 1, "by": "volume"},
+            )
+
+        return self._show(
+            {
+                "provider": "Alpaca",
+                "readOnly": True,
+                "credentialsLoaded": True,
+                "clockAvailable": clock_error is None,
+                "clockError": clock_error,
+                "clock": clock,
+                "screenerProbeRequested": bool(test_screeners),
+                "moversAvailable": None if not test_screeners else movers_error is None,
+                "moversError": movers_error,
+                "mostActiveAvailable": None if not test_screeners else actives_error is None,
+                "mostActiveError": actives_error,
+                "readyForQuotesSnapshotsBars": clock_error is None,
+                "note": (
+                    "Screener 403/plan restrictions do not prevent quote/snapshot use. "
+                    "Use scan_symbols with iex or delayed_sip when a candidate universe is supplied."
+                ),
+            }
+        )
+
+    async def asset_universe(
+        self,
+        exchange: str = "",
+        limit: int = 500,
+    ) -> str:
+        """
+        Return a bounded list of active US-equity assets from Alpaca.
+        Read-only. Useful for building a candidate universe; does not imply T212 tradability.
+        :param exchange: Optional exchange filter such as NASDAQ, NYSE, AMEX, ARCA.
+        :param limit: Maximum assets returned, 1-1000.
+        """
+        limit = max(1, min(int(limit), 1000))
+        params = {"status": "active", "asset_class": "us_equity"}
+        exchange = (exchange or "").strip().upper()
+        if exchange:
+            params["exchange"] = exchange
+
+        data, error = await self._get(self.trading_base, "/v2/assets", params=params)
+        if error:
+            return error
+
+        rows = []
+        for item in data if isinstance(data, list) else []:
+            if len(rows) >= limit:
+                break
+            rows.append(
+                {
+                    "symbol": item.get("symbol"),
+                    "name": item.get("name"),
+                    "exchange": item.get("exchange"),
+                    "status": item.get("status"),
+                    "tradable": item.get("tradable"),
+                    "fractionable": item.get("fractionable"),
+                }
+            )
+
+        return self._show(
+            {
+                "provider": "Alpaca",
+                "readOnly": True,
+                "count": len(rows),
+                "assets": rows,
+                "note": "Alpaca asset availability is not proof the instrument exists in T212.",
+            }
+        )
+
+    async def scan_symbols(
+        self,
+        symbols_csv: str,
+        top: int = 20,
+        feed: str = "delayed_sip",
+    ) -> str:
+        """
+        Rank a supplied US-equity symbol universe by percentage change versus previous close.
+        This provides a free/basic-plan-friendly fallback when real-time SIP screener endpoints
+        are unavailable. Read-only; never places orders.
+        :param symbols_csv: Comma-separated symbols, up to 30 per call.
+        :param top: Number of gainers and losers to return, 1-30.
+        :param feed: delayed_sip by default for consolidated delayed coverage; iex for free real-time IEX.
+        """
+        symbols = self._symbols(symbols_csv, max_symbols=30)
+        if not symbols:
+            return "No symbols supplied."
+
+        top = max(1, min(int(top), 30))
+        feed = (feed or "delayed_sip").strip().lower()
+        allowed = {"iex", "delayed_sip", "sip", "boats", "overnight", "otc"}
+        if feed not in allowed:
+            return f"Unsupported feed '{feed}'."
+
+        data, error = await self._get(
+            self.data_base,
+            "/v2/stocks/snapshots",
+            params={"symbols": ",".join(symbols), "feed": feed},
+        )
+        if error:
+            return error
+
+        snapshots = data.get("snapshots", data) if isinstance(data, dict) else {}
+        rows = []
+        for symbol in symbols:
+            snap = snapshots.get(symbol, {}) if isinstance(snapshots, dict) else {}
+            row = self._snapshot_summary(symbol, snap)
+            if row.get("price") is not None:
+                rows.append(row)
+
+        ranked = [
+            row for row in rows
+            if isinstance(row.get("changePctVsPrevClose"), (int, float))
+            and math.isfinite(row.get("changePctVsPrevClose"))
+        ]
+        ranked.sort(key=lambda row: row.get("changePctVsPrevClose"), reverse=True)
+
+        return self._show(
+            {
+                "provider": "Alpaca",
+                "feed": feed,
+                "readOnly": True,
+                "universeCount": len(symbols),
+                "pricedCount": len(rows),
+                "topGainers": ranked[:top],
+                "topLosers": list(reversed(ranked[-top:])),
+                "note": (
+                    "Ranks only the supplied symbol universe. "
+                    "Use exact timestamps/feed labels when making trading decisions."
+                ),
+            }
+        )
 
     async def market_clock(self) -> str:
         """
