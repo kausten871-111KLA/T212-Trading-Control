@@ -2,7 +2,7 @@
 title: Trading 212 DEMO Execution
 author: Katie / OpenAI
 description: Trading 212 paper-trading execution bridge for Open WebUI.
-version: 0.2.1
+version: 0.3.0
 """
 
 import os
@@ -116,7 +116,9 @@ class Pipe:
 
         if command.upper() == "HELP":
             return (
-                "T212 DEMO Execution Bridge v0.2\n\n"
+                "T212 DEMO Trading Gateway v0.3\n\n"
+                "DASHBOARD\n"
+                "ACCOUNT\n"
                 "FIND <name|symbol>\n"
                 "POSITIONS\n"
                 "POSITION <T212_TICKER>\n"
@@ -127,7 +129,7 @@ class Pipe:
                 "SELL <T212_TICKER> <QUANTITY>\n"
                 "SELL EXT <T212_TICKER> <QUANTITY>\n"
                 "CLOSE <T212_TICKER>\n\n"
-                "DEMO environment only."
+                "One controlled broker gateway. DEMO environment only."
             )
 
         match = re.fullmatch(r"FIND\s+(.+)", command, flags=re.IGNORECASE)
