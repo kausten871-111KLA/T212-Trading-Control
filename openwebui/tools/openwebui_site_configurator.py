@@ -2,7 +2,7 @@
 title: Open WebUI Site Configurator
 author: Katie / OpenAI
 description: Local Open WebUI workspace audit and additive configuration tool. Uses a server-side Open WebUI API key.
-version: 0.2.0
+version: 0.3.0
 """
 
 import os
@@ -289,6 +289,142 @@ class Tools:
             "action": action,
             "tool_id": tool_id,
             "name": name,
+        })
+
+
+    async def create_knowledge_from_github(
+        self,
+        knowledge_name: str,
+        description: str,
+        raw_url: str,
+        filename: str = "knowledge.md",
+    ) -> str:
+        """
+        Create or reuse one local Open WebUI Knowledge collection, upload a reviewed Markdown file
+        from the approved GitHub repository, and attach it to that collection.
+        Additive only: this does not delete existing knowledge or files.
+        """
+        allowed_prefix = (
+            "https://raw.githubusercontent.com/"
+            "kausten871-111KLA/T212-Trading-Control/"
+        )
+        if not raw_url.startswith(allowed_prefix):
+            return "Blocked: raw_url is outside the approved T212-Trading-Control GitHub repository."
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                source = await client.get(raw_url)
+                source.raise_for_status()
+                content = source.text
+        except Exception as exc:
+            return f"Failed to fetch GitHub knowledge source: {type(exc).__name__}: {exc}"
+
+        knowledge_data, error = await self._request("GET", "/api/v1/knowledge/")
+        if error:
+            return error
+
+        items = []
+        if isinstance(knowledge_data, dict):
+            items = knowledge_data.get("items") or []
+        elif isinstance(knowledge_data, list):
+            items = knowledge_data
+
+        knowledge = next(
+            (item for item in items if item.get("name") == knowledge_name),
+            None,
+        )
+
+        if not knowledge:
+            knowledge, error = await self._request(
+                "POST",
+                "/api/v1/knowledge/create",
+                json_body={
+                    "name": knowledge_name,
+                    "description": description,
+                    "access_grants": [],
+                },
+            )
+            if error:
+                return error
+
+        knowledge_id = knowledge.get("id")
+        if not knowledge_id:
+            return f"Knowledge creation/list response did not contain an id: {knowledge}"
+
+        existing_files, error = await self._request(
+            "GET",
+            f"/api/v1/knowledge/{knowledge_id}/files?query={filename}",
+        )
+        if error:
+            return error
+
+        existing_items = []
+        if isinstance(existing_files, dict):
+            existing_items = existing_files.get("items") or []
+
+        for item in existing_items:
+            visible_name = (
+                item.get("filename")
+                or (item.get("meta") or {}).get("name")
+                or ""
+            )
+            if visible_name.endswith(filename):
+                return self._show({
+                    "ok": True,
+                    "action": "already-present",
+                    "knowledge_id": knowledge_id,
+                    "knowledge_name": knowledge_name,
+                    "filename": filename,
+                    "file_id": item.get("id"),
+                })
+
+        key = self._key()
+        if not key:
+            return "OPENWEBUI_ADMIN_API_KEY is not available to Open WebUI."
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                upload = await client.post(
+                    f"{self.base_url}/api/v1/files/?process=true&process_in_background=false",
+                    headers={"Authorization": f"Bearer {key}"},
+                    files={
+                        "file": (
+                            filename,
+                            content.encode("utf-8"),
+                            "text/markdown",
+                        )
+                    },
+                )
+                try:
+                    upload_data = upload.json()
+                except Exception:
+                    upload_data = upload.text
+
+                if upload.is_error:
+                    return f"Open WebUI file upload error {upload.status_code}: {upload_data}"
+
+        except Exception as exc:
+            return f"Open WebUI file upload connection error: {type(exc).__name__}: {exc}"
+
+        file_id = upload_data.get("id") if isinstance(upload_data, dict) else None
+        if not file_id:
+            return f"File upload did not return an id: {upload_data}"
+
+        attached, error = await self._request(
+            "POST",
+            f"/api/v1/knowledge/{knowledge_id}/file/add",
+            json_body={"file_id": file_id},
+        )
+        if error:
+            return error
+
+        return self._show({
+            "ok": True,
+            "action": "created-and-attached",
+            "knowledge_id": knowledge_id,
+            "knowledge_name": knowledge_name,
+            "filename": filename,
+            "file_id": file_id,
         })
 
     async def list_tools(self) -> str:
