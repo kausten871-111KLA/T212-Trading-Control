@@ -2,12 +2,13 @@
 title: Trading 212 DEMO Execution
 author: Katie / OpenAI
 description: Trading 212 paper-trading execution bridge for Open WebUI.
-version: 0.2.0
+version: 0.2.1
 """
 
 import os
 import re
 import time
+import json
 import httpx
 
 
@@ -16,6 +17,11 @@ class Pipe:
         self.base_url = "https://demo.trading212.com/api/v0"
         self.last_submission = None
         self.last_submission_time = 0.0
+
+    def _show(self, value):
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, indent=2, default=str)
 
     def _credentials(self):
         return (
@@ -143,26 +149,26 @@ class Pipe:
                         "extendedHours": inst.get("extendedHours"),
                         "maxOpenQuantity": inst.get("maxOpenQuantity"),
                     })
-            return matches[:10] if matches else f"No T212 DEMO instrument matched '{match.group(1).strip()}'."
+            return self._show(matches[:10]) if matches else f"No T212 DEMO instrument matched '{match.group(1).strip()}'."
 
         if command.upper() == "POSITIONS":
             data, error = await self._request("GET", "/equity/positions")
-            return error or data
+            return error or self._show(data)
 
         match = re.fullmatch(r"POSITION\s+([A-Za-z0-9._-]+)", command, flags=re.IGNORECASE)
         if match:
             ticker = match.group(1).upper()
             data, error = await self._request("GET", "/equity/positions", params={"ticker": ticker})
-            return error or data
+            return error or self._show(data)
 
         if command.upper() == "ORDERS":
             data, error = await self._request("GET", "/equity/orders")
-            return error or data
+            return error or self._show(data)
 
         match = re.fullmatch(r"ORDER\s+(\d+)", command, flags=re.IGNORECASE)
         if match:
             data, error = await self._request("GET", f"/equity/orders/{match.group(1)}")
-            return error or data
+            return error or self._show(data)
 
         match = re.fullmatch(
             r"(BUY|SELL)(?:\s+(EXT))?\s+([A-Za-z0-9._-]+)\s+([0-9]+(?:\.[0-9]+)?)",
