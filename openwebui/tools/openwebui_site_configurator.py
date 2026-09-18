@@ -2,7 +2,7 @@
 title: Open WebUI Site Configurator
 author: Katie / OpenAI
 description: Local Open WebUI workspace audit and additive configuration tool. Uses a server-side Open WebUI API key.
-version: 0.3.0
+version: 0.3.1
 """
 
 import os
@@ -291,6 +291,27 @@ class Tools:
             "name": name,
         })
 
+
+
+    async def fetch_github_text(self, raw_url: str) -> str:
+        """
+        Fetch UTF-8 text from the approved project GitHub repository for configuration work.
+        Read-only. Use for reviewed system prompts, knowledge packs and setup files.
+        """
+        allowed_prefix = (
+            "https://raw.githubusercontent.com/"
+            "kausten871-111KLA/T212-Trading-Control/"
+        )
+        if not raw_url.startswith(allowed_prefix):
+            return "Blocked: raw_url is outside the approved T212-Trading-Control GitHub repository."
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(raw_url)
+                response.raise_for_status()
+                return response.text
+        except Exception as exc:
+            return f"Failed to fetch GitHub text: {type(exc).__name__}: {exc}"
 
     async def create_knowledge_from_github(
         self,
