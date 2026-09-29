@@ -104,6 +104,9 @@ class InstrumentCache:
             "instruments": instruments,
         }
         diff_payload = self.diff(previous, instruments)
+        if not previous:
+            diff_payload["added"] = []
+            diff_payload["addedCount"] = 0
         self._write_json_atomic(self.cache_path, payload)
         self._write_json_atomic(self.diff_path, diff_payload)
         return diff_payload
