@@ -1,0 +1,11 @@
+[Unit]
+Description=Run T212 deterministic discovery every 5 minutes
+
+[Timer]
+OnCalendar=*:0/5
+Persistent=true
+AccuracySec=20s
+Unit=t212-discovery.service
+
+[Install]
+WantedBy=timers.target
