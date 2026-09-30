@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded deterministic worker shell. Read-only by default; no broker orders."""
+"""Bounded deterministic worker shell. DEMO-only by default; DEMO broker execution permitted through the approved gateway."""
 import json, os, sys, time, traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,7 +21,7 @@ def log(event,payload=None):
 
 def main():
     started=datetime.now(timezone.utc)
-    status={"started_at":started.isoformat(),"mode":"READ_ONLY","ok":False}
+    status={"started_at":started.isoformat(),"mode":"DEMO","ok":False}
     try:
         # Placeholder orchestration shell: deterministic scanner modules are invoked
         # after live market-data discovery availability is verified.
