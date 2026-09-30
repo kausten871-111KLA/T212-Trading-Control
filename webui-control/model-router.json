@@ -1,0 +1,138 @@
+{
+  "version": "0.1",
+  "mode": "logical_roles_only",
+  "defaults": {
+    "role": "deep_reasoning",
+    "fail_closed": true,
+    "log_route_decision": true,
+    "require_human_review_for": [
+      "medical_claim",
+      "financial_decision",
+      "legal_claim",
+      "publish",
+      "deployment"
+    ]
+  },
+  "roles": {
+    "fast_text": {
+      "capabilities": [
+        "text",
+        "classification",
+        "extraction",
+        "summarisation"
+      ],
+      "model_env": "WEBUI_MODEL_FAST_TEXT",
+      "cost_tier": "low"
+    },
+    "deep_reasoning": {
+      "capabilities": [
+        "text",
+        "reasoning",
+        "drafting",
+        "coding"
+      ],
+      "model_env": "WEBUI_MODEL_DEEP_REASONING",
+      "cost_tier": "medium"
+    },
+    "vision": {
+      "capabilities": [
+        "text",
+        "vision",
+        "ocr",
+        "chart_reading",
+        "ui_analysis"
+      ],
+      "model_env": "WEBUI_MODEL_VISION",
+      "cost_tier": "medium"
+    },
+    "high_capability": {
+      "capabilities": [
+        "text",
+        "reasoning",
+        "science_review",
+        "architecture",
+        "final_qa"
+      ],
+      "model_env": "WEBUI_MODEL_HIGH_CAPABILITY",
+      "cost_tier": "high"
+    }
+  },
+  "routes": [
+    {
+      "priority": 100,
+      "when": {
+        "any_input_kind": [
+          "image",
+          "screenshot",
+          "scan",
+          "pdf_page_image"
+        ],
+        "requires_capability": "vision"
+      },
+      "role": "vision",
+      "hard_requirement": true
+    },
+    {
+      "priority": 90,
+      "when": {
+        "task_types": [
+          "science_review",
+          "architecture",
+          "final_qa"
+        ]
+      },
+      "role": "high_capability",
+      "human_review": true
+    },
+    {
+      "priority": 80,
+      "when": {
+        "task_types": [
+          "classification",
+          "tagging",
+          "extraction",
+          "summary",
+          "repetitive_transform"
+        ]
+      },
+      "role": "fast_text"
+    },
+    {
+      "priority": 70,
+      "when": {
+        "task_types": [
+          "reasoning",
+          "drafting",
+          "planning",
+          "coding",
+          "code_review"
+        ]
+      },
+      "role": "deep_reasoning"
+    }
+  ],
+  "fallback_policy": {
+    "allow_same_capability_fallback": true,
+    "never_downgrade_required_capability": true,
+    "vision_to_text_only": false,
+    "on_no_eligible_model": "BLOCK_AND_REPORT"
+  },
+  "privacy": {
+    "pass_secrets_to_models": false,
+    "persist_raw_attachments_by_default": false,
+    "log_attachment_metadata_only": true
+  },
+  "observability": [
+    "route_id",
+    "workspace",
+    "task_type",
+    "required_capabilities",
+    "selected_role",
+    "resolved_model",
+    "fallback_used",
+    "human_review_required",
+    "blocked_reason",
+    "estimated_cost_tier",
+    "timestamp"
+  ]
+}
