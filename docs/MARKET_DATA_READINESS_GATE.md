@@ -10,6 +10,6 @@ Required live checks:
 - Snapshot endpoint works for a supplied symbol batch.
 - Historical daily bars work for 20-day volume baselines.
 - Quote timestamps are current.
-- No broker order function is callable from the discovery worker.
+- Any execution path must use the approved Trading 212 DEMO gateway; LIVE execution must remain unavailable.
 
 If Alpaca screeners are plan-restricted, do not fake broad discovery with a tiny static watchlist. Select one market-data source capable of broad US movers, then separately add UK/LSE coverage.
