@@ -1,0 +1,20 @@
+version: 1
+workspaces:
+  trading:
+    title: T212 Trading Operations
+    safety: DEMO_ONLY
+    live_trading: false
+    agents: [market_discovery, catalyst_verifier, risk_gate, demo_execution_auditor]
+    state: [canonical_brief, daily_status, decision_log, missed_greens, run_ledger]
+  apps_plugins_bots:
+    title: Apps / Plugins / Bots
+    agents: [integration_architect, plugin_curator, qa_agent]
+    state: [registry, permissions, health, releases, rollback]
+  you_heal_content:
+    title: You Heal Content Production
+    agents: [content_director, script_editor, science_claims_reviewer, production_director, distribution_agent]
+    state: [topic_bank, production_queue, source_ledger, publish_queue, analytics]
+  books_publishing:
+    title: Books & Publishing
+    agents: [book_editor, research_agent, continuity_editor, fact_checker, publishing_agent]
+    state: [manuscript_map, chapter_status, research_queue, source_ledger, continuity_log, publication_checklist]
