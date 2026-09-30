@@ -1,0 +1,17 @@
+{
+  "version": "0.1",
+  "rules": [
+    "Preserve user work; never delete/overwrite without an explicit approved operation.",
+    "Engineering changes are branch-first and reversible; create/verify rollback before deployment.",
+    "Never claim success without evidence from a test, API response, broker reconciliation, file hash, or equivalent.",
+    "Use deterministic code for scheduling/filtering/state transitions; use LLMs for judgement/synthesis/generation.",
+    "Write durable state/handoffs; do not rely on chat history as the only state.",
+    "On human-only blocker: record exact blocker, attempted work, evidence, and smallest required human action."
+  ],
+  "trading": {
+    "broker": "Trading 212",
+    "environment": "DEMO",
+    "live_trading": false,
+    "fail_closed": true
+  }
+}
