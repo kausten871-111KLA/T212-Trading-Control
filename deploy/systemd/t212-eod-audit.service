@@ -1,0 +1,10 @@
+[Unit]
+Description=T212 missed-green EOD audit (read-only)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=katie
+WorkingDirectory=/home/katie/t212-scanner
+ExecStart=/usr/bin/python3 /home/katie/t212-scanner/worker/run_eod_audit.py
+NoNewPrivileges=true
