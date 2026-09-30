@@ -1,0 +1,10 @@
+[Unit]
+Description=T212 DEMO instrument metadata cache refresh
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=katie
+WorkingDirectory=/home/katie/t212-scanner
+ExecStart=/usr/bin/python3 /home/katie/t212-scanner/scripts/refresh_t212_cache_worker.py
+NoNewPrivileges=true
