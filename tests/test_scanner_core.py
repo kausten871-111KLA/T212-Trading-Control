@@ -5,6 +5,8 @@ from pathlib import Path
 
 from openwebui.tools.deterministic_opportunity_scanner import DeterministicScanner, ScannerConfig
 from openwebui.tools.movement_tier_state import MovementTierState
+from openwebui.tools.catalyst_handoff_queue import CatalystHandoffQueue
+from openwebui.tools.t212_instrument_cache import InstrumentCache
 from openwebui.tools.missed_green_audit import MissedGreenAudit
 from openwebui.tools.opportunity_ledger import OpportunityLedger
 from openwebui.tools.scanner_metrics import average_daily_volume_from_bars, enrich_snapshot
@@ -61,6 +63,37 @@ class ScannerCoreTests(unittest.TestCase):
         by_symbol = {r['symbol']: r['audit_code'] for r in result['rows']}
         self.assertEqual(by_symbol['AAA'], 'NEV')
         self.assertEqual(by_symbol['BBB'], 'RET')
+
+    def test_t212_cache_first_snapshot_is_baseline(self):
+        with tempfile.TemporaryDirectory() as td:
+            cache = InstrumentCache(
+                cache_path=str(Path(td)/'cache.json'),
+                diff_path=str(Path(td)/'diff.json'),
+            )
+            d = cache.save_snapshot([{'ticker':'AAA_US_EQ'}], previous=[])
+            self.assertFalse(d['baselineWasPresent'])
+            self.assertEqual(d['addedCount'], 0)
+
+    def test_catalyst_queue_dedup_and_ack(self):
+        with tempfile.TemporaryDirectory() as td:
+            q = CatalystHandoffQueue(path=str(Path(td)/'queue.jsonl'), max_per_day=20)
+            candidate = {'symbol':'ABC','tier_state':{'current_tier':5.0}}
+            first = q.enqueue(candidate)
+            second = q.enqueue(candidate)
+            self.assertTrue(first['queued'])
+            self.assertFalse(second['queued'])
+            event_id = first['event']['id']
+            self.assertIsNotNone(q.claim(event_id))
+            done = q.acknowledge(event_id, 'done', {'catalyst_state':'verified'})
+            self.assertEqual(done['status'], 'done')
+
+    def test_catalyst_queue_daily_budget(self):
+        with tempfile.TemporaryDirectory() as td:
+            q = CatalystHandoffQueue(path=str(Path(td)/'queue.jsonl'), max_per_day=1)
+            self.assertTrue(q.enqueue({'symbol':'AAA','tier_state':{'current_tier':5.0}})['queued'])
+            blocked = q.enqueue({'symbol':'BBB','tier_state':{'current_tier':5.0}})
+            self.assertFalse(blocked['queued'])
+            self.assertEqual(blocked['reason'], 'daily_budget_reached')
 
 
 if __name__ == '__main__':
