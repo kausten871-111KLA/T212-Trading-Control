@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "webui-control/automation-run-schema.json",
+  "title": "WebUI Automation Run Ledger Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "workspace",
+    "workflow",
+    "started_at",
+    "status",
+    "attempt",
+    "input_refs",
+    "output_refs",
+    "evidence",
+    "approvals",
+    "next_action"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+    },
+    "workspace": {
+      "enum": [
+        "t212-demo",
+        "apps-plugins-bots",
+        "you-heal-content",
+        "books-publishing"
+      ]
+    },
+    "workflow": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ended_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "heartbeat_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "RUNNING",
+        "SUCCEEDED",
+        "FAILED",
+        "BLOCKED",
+        "CANCELLED"
+      ]
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "input_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "output_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "model_role": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 64
+    },
+    "tool_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 64
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "estimated",
+        "actual"
+      ],
+      "properties": {
+        "currency": {
+          "enum": [
+            "GBP",
+            "USD",
+            "CREDITS",
+            "TOKENS",
+            "NONE"
+          ]
+        },
+        "estimated": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "actual": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "error": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "summary",
+        "retryable"
+      ],
+      "properties": {
+        "category": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "state"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "state": {
+            "enum": [
+              "NOT_REQUIRED",
+              "PENDING",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "approver_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "next_action": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 1000
+    },
+    "safety": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "enum": [
+            "DEMO",
+            "NON_TRADING"
+          ]
+        },
+        "live_trading": {
+          "const": false
+        },
+        "order_mutation": {
+          "const": false
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "workspace": {
+            "const": "t212-demo"
+          }
+        },
+        "required": [
+          "workspace"
+        ]
+      },
+      "then": {
+        "required": [
+          "safety"
+        ],
+        "properties": {
+          "safety": {
+            "type": "object",
+            "required": [
+              "environment",
+              "live_trading",
+              "order_mutation"
+            ],
+            "properties": {
+              "environment": {
+                "const": "DEMO"
+              },
+              "live_trading": {
+                "const": false
+              },
+              "order_mutation": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
