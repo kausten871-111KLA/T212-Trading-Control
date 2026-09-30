@@ -1,0 +1,88 @@
+{
+  "version": "0.1",
+  "workspaces": [
+    {
+      "id": "t212-demo",
+      "name": "T212 Trading Operations",
+      "safety": {
+        "mode": "DEMO_ONLY",
+        "live_trading": false,
+        "fail_closed": true
+      },
+      "agents": [
+        "market-discovery",
+        "catalyst-verifier",
+        "risk-gate",
+        "demo-execution-verifier",
+        "missed-op-auditor"
+      ],
+      "state": [
+        "universe",
+        "instrument_cache",
+        "scan_runs",
+        "candidate_queue",
+        "orders",
+        "broker_reconciliation",
+        "handoff"
+      ]
+    },
+    {
+      "id": "apps-plugins-bots",
+      "name": "Apps / Plugins / Bots",
+      "agents": [
+        "webui-engineer",
+        "plugin-manager",
+        "integration-tester",
+        "release-manager"
+      ],
+      "state": [
+        "plugin_registry",
+        "deployments",
+        "tests",
+        "incidents",
+        "handoff"
+      ]
+    },
+    {
+      "id": "you-heal-content",
+      "name": "You Heal Content Production",
+      "agents": [
+        "content-director",
+        "script-editor",
+        "science-claims-reviewer",
+        "film-director",
+        "distribution-agent",
+        "analytics-agent"
+      ],
+      "state": [
+        "topic_bank",
+        "scripts",
+        "recordings",
+        "assets",
+        "publish_queue",
+        "performance",
+        "handoff"
+      ]
+    },
+    {
+      "id": "books-publishing",
+      "name": "Books & Publishing",
+      "agents": [
+        "book-editor",
+        "research-agent",
+        "continuity-editor",
+        "fact-checker",
+        "publishing-agent"
+      ],
+      "state": [
+        "manuscripts",
+        "chapter_status",
+        "source_ledger",
+        "research_questions",
+        "continuity",
+        "versions",
+        "handoff"
+      ]
+    }
+  ]
+}
