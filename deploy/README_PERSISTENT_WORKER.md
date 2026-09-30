@@ -1,13 +1,13 @@
-# Persistent Trading Discovery Worker (DEMO / read-only first)
+# Persistent Trading Discovery Worker (DEMO / DEMO-only first)
 
 This package is designed to run independently of ChatGPT, a browser tab, or the user's laptop.
 
 Safety baseline:
 - Trading 212 DEMO only.
-- Discovery, cache refresh, queueing and audit are read-only.
-- No order action is implemented in the worker package.
+- Discovery, cache refresh, queueing and audit are DEMO-only.
+- DEMO execution is permitted only through the approved Trading 212 DEMO gateway; LIVE remains disabled.
 - Broker order submission remains isolated in the existing Open WebUI T212 DEMO gateway.
-- Do not enable timers until read-only tests pass on Contabo.
+- Do not enable timers until DEMO-only tests pass on Contabo.
 
 Services prepared:
 - `t212-discovery.timer`: deterministic 5-minute worker cadence.
