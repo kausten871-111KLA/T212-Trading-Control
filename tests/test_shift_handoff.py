@@ -51,7 +51,12 @@ class ShiftHandoffTests(unittest.TestCase):
         records = [
             run_record(run_id="wanted"),
             run_record(run_id="other", workspace="books-publishing"),
-            run_record(run_id="late", started_at="2026-10-01T02:00:00Z"),
+            run_record(
+                run_id="late",
+                started_at="2026-10-01T02:00:00Z",
+                ended_at="2026-10-01T02:01:00Z",
+                heartbeat_at="2026-10-01T02:01:00Z",
+            ),
         ]
         handoff = build_handoff(
             records,
