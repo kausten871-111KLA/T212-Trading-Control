@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Automation Run Ledger",
+  "type": "object",
+  "required": [
+    "runId",
+    "workflow",
+    "projectId",
+    "startedAt",
+    "status"
+  ],
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "workflow": {
+      "type": "string"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "endedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "status": {
+      "enum": [
+        "running",
+        "succeeded",
+        "failed",
+        "blocked",
+        "awaiting_approval"
+      ]
+    },
+    "model": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "inputRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "outputRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tokenCost": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "creditCost": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "retries": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "approvalRequired": {
+      "type": "boolean"
+    },
+    "nextAction": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
