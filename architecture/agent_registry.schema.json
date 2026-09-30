@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WebUI Agent Registry",
+  "type": "object",
+  "required": [
+    "agents"
+  ],
+  "properties": {
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "projectId",
+          "role",
+          "modelPolicy",
+          "approvalPolicy",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "modelPolicy": {
+            "type": "string"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approvalPolicy": {
+            "enum": [
+              "auto",
+              "human_for_external_write",
+              "human_for_high_risk",
+              "always_human"
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "paused",
+              "blocked"
+            ]
+          },
+          "healthCheck": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "handoffTarget": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
