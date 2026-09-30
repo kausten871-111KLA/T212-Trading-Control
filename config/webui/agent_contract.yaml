@@ -1,0 +1,15 @@
+version: 1
+defaults:
+  preserve_user_work: true
+  destructive_changes: forbidden_without_explicit_approval
+  source_control_changes: branch_first
+  require_rollback_for_deployments: true
+  report_blockers_early: true
+  never_claim_success_without_verification: true
+  handoff:
+    fields: [workspace, timestamp, completed, evidence, blockers, next_actions]
+trading:
+  environment: DEMO
+  live_trading_enabled: false
+  order_rule: verify_broker_response_and_reconcile
+  safety_failure: halt_execution_and_report
