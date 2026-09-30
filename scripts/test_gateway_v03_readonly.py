@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only validation for self-contained T212 DEMO gateway v0.3 candidate."""
+"""DEMO-only validation for self-contained T212 DEMO gateway v0.3 candidate."""
 import asyncio, importlib.util, json, os, sys, tempfile
 from pathlib import Path
 
@@ -30,7 +30,7 @@ async def main():
         assert new["newCount"]==0
         second=json.loads(await tool.refresh_instrument_cache(force=False))
         assert second["cacheSource"]=="disk"
-        print("GATEWAY_V03_READ_ONLY_TEST=PASS")
+        print("GATEWAY_V03_DEMO_TEST=PASS")
         print("INSTRUMENT_COUNT="+str(first["instrumentCount"]))
         print("SEARCH_MATCHES="+str(len(search)))
         print("CACHE_SOURCE_SECOND="+second["cacheSource"])
