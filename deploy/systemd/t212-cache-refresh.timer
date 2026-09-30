@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily T212 instrument cache refresh
+
+[Timer]
+OnCalendar=Mon..Fri 07:15
+Persistent=true
+Unit=t212-cache-refresh.service
+
+[Install]
+WantedBy=timers.target
