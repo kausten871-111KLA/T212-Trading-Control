@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "webui-control/shift-handoff-schema.json",
+  "title": "WebUI Workspace Shift Handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "handoff_id",
+    "workspace",
+    "cadence",
+    "generated_at",
+    "period_start",
+    "period_end",
+    "executive_summary",
+    "run_counts",
+    "completed",
+    "evidence",
+    "current_state",
+    "blockers",
+    "approvals_required",
+    "next_actions",
+    "artifacts",
+    "rollback"
+  ],
+  "properties": {
+    "handoff_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128
+    },
+    "workspace": {
+      "enum": [
+        "t212-demo",
+        "apps-plugins-bots",
+        "you-heal-content",
+        "books-publishing"
+      ]
+    },
+    "cadence": {
+      "enum": [
+        "MORNING",
+        "EVENING",
+        "EVENT"
+      ]
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "period_start": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "period_end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "executive_summary": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "run_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "succeeded",
+        "failed",
+        "blocked",
+        "running",
+        "stale"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "succeeded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "running": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "completed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "current_state": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1000
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "summary",
+          "owner",
+          "smallest_action"
+        ],
+        "properties": {
+          "summary": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "owner": {
+            "enum": [
+              "SYSTEM",
+              "KATIE",
+              "EXTERNAL"
+            ]
+          },
+          "smallest_action": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "approvals_required": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "state"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "state": {
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "approver_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "owner",
+          "priority"
+        ],
+        "properties": {
+          "action": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "owner": {
+            "enum": [
+              "SYSTEM",
+              "KATIE",
+              "EXTERNAL"
+            ]
+          },
+          "priority": {
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "rollback": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 1000
+    },
+    "safety": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "environment": {
+          "enum": [
+            "DEMO",
+            "NON_TRADING"
+          ]
+        },
+        "live_trading": {
+          "const": false
+        },
+        "order_mutation": {
+          "const": false
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "workspace": {
+            "const": "t212-demo"
+          }
+        },
+        "required": [
+          "workspace"
+        ]
+      },
+      "then": {
+        "required": [
+          "safety"
+        ],
+        "properties": {
+          "safety": {
+            "type": "object",
+            "required": [
+              "environment",
+              "live_trading",
+              "order_mutation"
+            ],
+            "properties": {
+              "environment": {
+                "const": "DEMO"
+              },
+              "live_trading": {
+                "const": false
+              },
+              "order_mutation": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
