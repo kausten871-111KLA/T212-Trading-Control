@@ -33,3 +33,17 @@ Alpaca documents that the stock movers endpoint resets at the regular-market ope
 
 ## WebUI canonical status message
 30 SEP SYSTEM UPDATE: Contabo-hosted Open WebUI is stable behind Cloudflare Access. T212 is DEMO-only and LIVE remains disabled. Gateway v0.3 has passed isolated container validation and adds a persistent instrument cache so broker metadata is not repeatedly requested per symbol. Alpaca mover, most-active, snapshots and bars are available. Discovery logic is session-aware: prior-session mover results before 09:30 ET are expected and used only as seeds; after market open, current-session screeners plus current snapshots drive discovery. Deterministic gates, movement tiers, catalyst queue controls, persistent ledger and missed-green audit are staged. Next controlled changes are Gateway v0.3 installation, 20-day volume baseline join, persistent worker/timer enablement and tomorrow's DEMO trading-window verification.
+
+
+## US Open Trading Ops finding — 30 Sep
+
+The Trading Operations US-open chat reconciled the T212 DEMO account at £288.28 equity/cash, 0 positions, 0 pending orders, realised P/L -£8.97, and preserved LIVE-disabled state. It rejected the surfaced candidate set because the scan was dominated by warrants/rights, reverse-split or stale-symbol artefacts, penny stocks, wide spreads, and names without a confirmed catalyst.
+
+Interpretation:
+- The no-trade outcome was safe, but it must not be treated as proof that discovery is healthy.
+- The candidate universe still needs structural filtering before catalyst/search work: reject warrants/rights/units, sub-$0.50 names, obvious stale/legacy symbols, and reverse-split artefacts before ranking.
+- CAPR-like names with acceptable spread but no verified catalyst should remain unqualified until catalyst verification.
+- TGE_old/legacy-symbol contamination shows asset-master hygiene must be part of discovery.
+- Every US-open automation must verify the market clock timestamp/session explicitly before declaring the regular session open.
+
+The system goal for the next session is not 'force a trade'; it is broad current-session discovery -> deterministic qualification -> catalyst verification -> T212 DEMO tradability -> execution only when a candidate genuinely clears the gates.
