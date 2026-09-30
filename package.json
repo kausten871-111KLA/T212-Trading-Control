@@ -1,0 +1,8 @@
+{
+  "name": "t212-trading-control",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/worker.test.mjs"
+  }
+}
