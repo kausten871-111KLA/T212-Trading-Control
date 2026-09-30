@@ -1,0 +1,16 @@
+[Unit]
+Description=T212 deterministic discovery cycle (read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=katie
+WorkingDirectory=/home/katie/t212-scanner
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/katie/t212-scanner/worker/run_discovery_cycle.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/t212-scanner /home/katie/t212-scanner
