@@ -2,7 +2,7 @@
 title: Deterministic Opportunity Scanner Core
 author: Katie / OpenAI
 description: Pure deterministic ranking/gating core for DEMO market discovery. No broker writes and no LLM calls.
-version: 0.1.0
+version: 0.2.0
 """
 
 from dataclasses import dataclass, asdict
@@ -18,6 +18,7 @@ class ScannerConfig:
     price_min: float = 0.50
     today_dollar_vol_min: float = 500_000.0
     shortlist_top_m: int = 20
+    reject_symbol_suffixes: tuple = (".W", ".WS", ".WT", ".RT", ".R", ".U")
 
 
 class DeterministicScanner:
@@ -38,8 +39,14 @@ class DeterministicScanner:
         spread = self._safe_float(row.get("spread_pct"))
         dollar_vol = self._safe_float(row.get("dollar_vol"))
         tradable = bool(row.get("tradable"))
+        symbol = str(row.get("symbol") or "").upper().strip()
+        asset_status = str(row.get("asset_status") or "").lower().strip()
 
         reasons = []
+        if any(symbol.endswith(suffix) for suffix in cfg.reject_symbol_suffixes):
+            reasons.append("SECURITY_TYPE")
+        if asset_status in {"inactive", "delisted", "legacy", "stale"}:
+            reasons.append("ASSET_STATUS")
         state = "qualified"
 
         if price is None or price < cfg.price_min:
@@ -102,7 +109,7 @@ class DeterministicScanner:
         qualified.sort(key=lambda item: item.get("rank_score", 0.0), reverse=True)
 
         return {
-            "scannerVersion": "0.1.0",
+            "scannerVersion": "0.2.0",
             "config": asdict(self.config),
             "evaluatedCount": len(evaluated),
             "qualifiedCount": len(qualified),
