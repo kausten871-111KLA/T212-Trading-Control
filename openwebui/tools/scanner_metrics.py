@@ -41,6 +41,7 @@ def enrich_snapshot(
     avg20_volume: Optional[float],
     t212_ticker: Optional[str] = None,
     tradable: bool = False,
+    session_elapsed_fraction: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Convert one market snapshot + historical-volume baseline into scanner-ready metrics.
@@ -56,8 +57,16 @@ def enrich_snapshot(
         change_pct = (price / previous_close - 1.0) * 100.0
 
     rel_vol = None
+    rel_vol_method = None
     if day_volume is not None and avg20_volume not in (None, 0):
-        rel_vol = day_volume / avg20_volume
+        if session_elapsed_fraction is not None:
+            elapsed = max(0.05, min(float(session_elapsed_fraction), 1.0))
+            expected_volume_to_now = avg20_volume * elapsed
+            rel_vol = day_volume / expected_volume_to_now if expected_volume_to_now else None
+            rel_vol_method = "elapsed_session_pace"
+        else:
+            rel_vol = day_volume / avg20_volume
+            rel_vol_method = "full_day_baseline_crude"
 
     spread_pct = None
     if bid not in (None, 0) and ask not in (None, 0) and ask >= bid:
@@ -78,6 +87,7 @@ def enrich_snapshot(
         "day_volume": day_volume,
         "avg20_volume": avg20_volume,
         "rel_vol": rel_vol,
+        "rel_vol_method": rel_vol_method,
         "bid": bid,
         "ask": ask,
         "spread_pct": spread_pct,
