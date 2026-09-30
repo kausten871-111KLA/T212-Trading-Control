@@ -36,6 +36,21 @@ class ScannerCoreTests(unittest.TestCase):
         }])
         self.assertEqual(result['qualifiedCount'], 1)
 
+    def test_movement_tier_boundaries(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = MovementTierState(path=str(Path(td)/'tiers.json'))
+            self.assertEqual(state.tier_for_change(4.99), 0.0)
+            self.assertEqual(state.tier_for_change(5.0), 5.0)
+            self.assertEqual(state.tier_for_change(9.99), 5.0)
+            self.assertEqual(state.tier_for_change(10.0), 10.0)
+            self.assertEqual(state.tier_for_change(19.99), 10.0)
+            self.assertEqual(state.tier_for_change(20.0), 20.0)
+            self.assertEqual(state.tier_for_change(49.99), 20.0)
+            self.assertEqual(state.tier_for_change(50.0), 50.0)
+            self.assertEqual(state.tier_for_change(81.5), 50.0)
+            self.assertEqual(state.tier_for_change(99.99), 50.0)
+            self.assertEqual(state.tier_for_change(100.0), 100.0)
+
     def test_movement_tiers_persist(self):
         with tempfile.TemporaryDirectory() as td:
             state = MovementTierState(path=str(Path(td)/'tiers.json'))
