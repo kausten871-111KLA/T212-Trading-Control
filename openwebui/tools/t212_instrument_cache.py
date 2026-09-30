@@ -7,8 +7,14 @@ version: 0.1.0
 
 import json
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 
 class InstrumentCache:
@@ -21,6 +27,20 @@ class InstrumentCache:
         self.cache_path = Path(cache_path)
         self.diff_path = Path(diff_path)
         self.ttl_seconds = int(ttl_seconds)
+        self.lock_path = self.cache_path.with_suffix(self.cache_path.suffix + ".lock")
+
+    @contextmanager
+    def lock(self):
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = self.lock_path.open("a+")
+        try:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
 
     def load(self) -> Dict[str, Any] | None:
         if not self.cache_path.exists():
