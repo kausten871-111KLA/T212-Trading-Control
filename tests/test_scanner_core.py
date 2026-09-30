@@ -36,6 +36,18 @@ class ScannerCoreTests(unittest.TestCase):
         }])
         self.assertEqual(result['qualifiedCount'], 1)
 
+    def test_scanner_rejects_warrants_and_stale_assets(self):
+        scanner = DeterministicScanner(ScannerConfig())
+        rows = [
+            {'symbol':'ABC.W','price':10,'change_pct':12,'rel_vol':3,'spread_pct':1,'dollar_vol':2000000,'tradable':True},
+            {'symbol':'OLD','asset_status':'legacy','price':10,'change_pct':12,'rel_vol':3,'spread_pct':1,'dollar_vol':2000000,'tradable':True},
+        ]
+        result = scanner.scan(rows)
+        self.assertEqual(result['qualifiedCount'], 0)
+        failures = {r['symbol']: r['gate_failures'] for r in result['rejected']}
+        self.assertIn('SECURITY_TYPE', failures['ABC.W'])
+        self.assertIn('ASSET_STATUS', failures['OLD'])
+
     def test_movement_tier_boundaries(self):
         with tempfile.TemporaryDirectory() as td:
             state = MovementTierState(path=str(Path(td)/'tiers.json'))
