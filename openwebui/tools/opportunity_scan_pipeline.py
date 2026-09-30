@@ -48,10 +48,18 @@ class OpportunityScanPipeline:
             row["tier_state"] = tier
             if tier.get("newly_qualified") or tier.get("escalated"):
                 event = self.catalyst_queue.enqueue(row)
-                self.ledger.append("catalyst_handoff_queued", event)
-                queued.append(event)
+                if event.get("queued"):
+                    self.ledger.append("catalyst_handoff_queued", event)
+                    queued.append(event)
+                else:
+                    self.ledger.append("catalyst_handoff_skipped", {
+                        "symbol": symbol,
+                        "reason": event.get("reason"),
+                        "tier_state": tier,
+                    })
         for row in result.get("rejected", []):
             self.ledger.append("scanner_rejected", row)
         result["catalystQueueCount"] = len(queued)
         result["catalystQueueEvents"] = queued
+        result["catalystQueueStats"] = self.catalyst_queue.stats()
         return result
