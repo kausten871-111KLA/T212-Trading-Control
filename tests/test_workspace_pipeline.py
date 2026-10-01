@@ -91,7 +91,7 @@ class WorkspacePipelineTests(unittest.TestCase):
             2,
             updated_at="2026-10-01T01:00:00Z",
         )
-        self.assertEqual(source["state"], "DRAFT")
+        self.assertEqual(source["state"], "LAYOUT")
         self.assertEqual(source["version"], 1)
         self.assertEqual(updated["state"], "READY_FOR_APPROVAL")
         self.assertEqual(updated["version"], 2)
