@@ -1,5 +1,5 @@
 {
-  "version": "0.6",
+  "version": "0.7",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
@@ -109,6 +109,11 @@
       "id": "discovery-worker",
       "config": null,
       "code": "worker/run_discovery_cycle.py"
+    },
+    {
+      "id": "discovery-session-gate",
+      "config": null,
+      "code": "worker/session_gate.py"
     },
     {
       "id": "discovery-healthcheck",
