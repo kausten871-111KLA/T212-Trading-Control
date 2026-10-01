@@ -1,15 +1,34 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "workspace": "t212-demo",
-  "purpose": "Canonical durable operating requirements recovered from user directives. This file is descriptive governance and does not authorize order submission.",
+  "purpose": "Canonical durable operating requirements recovered from user directives and the local Trading Operations canonical/recovery packs. This file governs DEMO operating behaviour and does not authorize order submission by itself.",
+  "source_precedence": [
+    "current_explicit_user_instruction",
+    "verified_broker_and_environment_state",
+    "this_canonical_methodology",
+    "project_runbooks",
+    "older_recovery_documents",
+    "global_model_prompt"
+  ],
   "safety": {
     "environment": "DEMO",
     "live_trading": false,
     "order_mutation_during_control_validation": false,
     "human_approval_required_for_order_proposals": true,
     "broker_evidence_required_for_execution_claims": true,
-    "fail_closed_on_stale_or_missing_data": true
+    "fail_closed_on_stale_or_missing_data": true,
+    "shorting": "DEFERRED",
+    "long_only_default": true,
+    "averaging_down": false,
+    "leverage_or_cfds": false
   },
+  "operating_functions": [
+    "SCOUT",
+    "INVESTIGATOR",
+    "DECISION_ENGINE",
+    "EXECUTOR",
+    "REVIEWER"
+  ],
   "discovery": {
     "broad_universe": true,
     "signals": [
@@ -31,7 +50,9 @@
       "spread",
       "data_freshness"
     ],
-    "cache_first_instrument_lookup": true
+    "cache_first_instrument_lookup": true,
+    "candidate_queue_timestamp_required": true,
+    "multiple_candidates_required": true
   },
   "cause_effect": {
     "sequence": [
@@ -42,16 +63,58 @@
       "price_response",
       "tradability"
     ],
+    "causal_confidence": [
+      "CONFIRMED",
+      "PROBABLE",
+      "UNKNOWN"
+    ],
     "source_evidence_required": true,
-    "preferred_source_count_per_sector": "2-5"
+    "preferred_source_count_per_sector": "2-5",
+    "unknown_is_valid": true,
+    "retroactive_rationalisation_forbidden": true
+  },
+  "qualification": {
+    "required_states": {
+      "price_direction": ["GREEN", "RED"],
+      "momentum": ["HIGH", "LOW"],
+      "relative_volume": ["HIGH", "NORMAL", "LOW"],
+      "liquidity": ["PASS", "FAIL"],
+      "spread": ["PASS", "FAIL"],
+      "cause": ["CONFIRMED", "PROBABLE", "UNKNOWN"],
+      "market_sector_support": ["YES", "NO", "MIXED"],
+      "move_exhaustion": ["EARLY", "MID", "LATE"],
+      "external_corroboration": ["YES", "NO"],
+      "t212_execution_status": ["PASS", "FAIL"]
+    },
+    "explicit_unknown_allowed": true,
+    "fixed_rejection_reason_required": true
+  },
+  "trade_signal": {
+    "formula": "S_trade = (w_s * Sentiment + w_m * Momentum) * (1 - sigma / Confidence)",
+    "working_weights": {
+      "sentiment": 0.6,
+      "momentum": 0.4
+    },
+    "decision_aid_only": true,
+    "cannot_override": [
+      "stale_data",
+      "poor_liquidity",
+      "unacceptable_spread",
+      "invalid_instrument",
+      "broker_truth",
+      "risk_controls"
+    ]
   },
   "proposal_fields": [
     "symbol",
     "timestamp",
     "data_source",
     "data_age",
+    "candidate_source",
     "reason",
     "catalyst_evidence",
+    "cause_confidence",
+    "qualification_gates",
     "entry_range",
     "profit_targets",
     "risk_stop",
@@ -61,6 +124,10 @@
     "volatility",
     "dilution_or_manipulation_risk",
     "confidence_evidence_level",
+    "ordinary_ticker",
+    "t212_ticker",
+    "intended_exposure",
+    "quantity",
     "broker_tradability",
     "approval_state",
     "execution_state"
@@ -78,30 +145,145 @@
     "EXIT",
     "REVIEW"
   ],
+  "execution_truth": {
+    "ordered_requires_broker_acceptance": true,
+    "filled_requires_broker_state_verification": true,
+    "closed_requires_broker_closure_verification": true,
+    "t212_market_post_non_idempotent": true,
+    "blind_retry_for_order_post": false,
+    "reconcile_after_each_write": true,
+    "reconcile_after_restart_before_new_action": true
+  },
+  "lanes": {
+    "intraday": {
+      "horizon": "minutes_to_hours",
+      "same_day_exit_default": true,
+      "silent_conversion_to_swing": false
+    },
+    "swing": {
+      "horizon": "2_to_10_days",
+      "separate_rules_required": true
+    },
+    "position": {
+      "horizon": "weeks_to_months",
+      "separate_rules_required": true
+    }
+  },
+  "risk_envelope": {
+    "baseline_equity_gbp": 300,
+    "planned_loss_per_trade": "lower_of_1pct_equity_or_3_gbp",
+    "position_value": "lower_of_25pct_equity_or_75_gbp",
+    "max_concurrent_positions": 3,
+    "aggregate_open_risk": "lower_of_3pct_equity_or_9_gbp",
+    "daily_loss_stop": "lower_of_2pct_starting_daily_equity_or_6_gbp",
+    "weekly_loss_stop": "lower_of_4pct_starting_weekly_equity_or_12_gbp",
+    "experiment_drawdown_stop": "lower_of_10pct_high_water_equity_or_30_gbp",
+    "minimum_reward_risk_to_first_target": "2_to_1_after_expected_friction",
+    "normal_session_spread_ceiling_pct_midpoint": 2.5,
+    "overnight_holding_default": false,
+    "recalculate_from_verified_broker_equity": true,
+    "legacy_positions_do_not_authorize_new_trade_sizing": true,
+    "shared_cash_and_risk_authority": true,
+    "prevent_double_allocation_across_controllers": true
+  },
   "learning": {
     "missed_greens_review": true,
-    "audit_reasons": [
-      "not_discovered",
-      "discovered_too_late",
-      "rejected_by_filter",
-      "stale_data",
-      "catalyst_not_confirmed",
-      "liquidity_or_spread_rejection",
-      "human_approval_absent",
-      "technical_failure"
+    "root_cause_codes": [
+      "SCANNER_DETECTION_FAILURE",
+      "QUALIFICATION_LATENCY",
+      "EXECUTION_INTEGRATION_FAILURE",
+      "RULE_THRESHOLD_FALSE_NEGATIVE",
+      "FALSE_POSITIVE_QUALIFICATION_FAILURE",
+      "EXIT_POLICY_FAILURE",
+      "LATE_DETECTION_CHASE_AVOIDED",
+      "UNKNOWN_CAUSE",
+      "DATA_FAILURE",
+      "BROKER_FAILURE"
     ],
     "feedback_to_discovery": true,
-    "automatic_gate_weakening": false
+    "automatic_gate_weakening": false,
+    "reduce_false_negatives_without_uncontrolled_false_positives": true,
+    "detection_latency_tracked": true,
+    "qualification_latency_tracked": true
+  },
+  "zero_trade_policy": {
+    "zero_trade_day_is_not_automatically_strategy_failure": true,
+    "zero_trade_day_is_operational_exception": true,
+    "precise_reason_required": true,
+    "corrective_action_required_if_system_or_process_failure": true
   },
   "operating_windows": [
     "UK_OPEN",
     "US_OPEN",
     "US_CLOSE"
   ],
+  "validation_programme": {
+    "name": "20_DEMO_TRADES",
+    "purpose": "process_validation_not_forced_profit",
+    "target_count": 20,
+    "required_trade_record_fields": [
+      "candidate_source",
+      "catalyst_or_cause_confidence",
+      "qualification_gates",
+      "ordinary_ticker",
+      "t212_ticker",
+      "exposure",
+      "quantity",
+      "broker_response",
+      "fill_verification",
+      "exit_reason",
+      "closure_verification",
+      "realised_result",
+      "failure_or_rejection_code",
+      "learning_item"
+    ]
+  },
+  "benchmark_qc": {
+    "role": "process_benchmark_not_copy_trade_authority",
+    "dimensions": [
+      "candidate_discovery",
+      "catalyst_recognition",
+      "entry_timing",
+      "risk_framing",
+      "exit_discipline",
+      "post_trade_review"
+    ],
+    "benchmarks": [
+      "Ross Cameron",
+      "SMB Capital / Mike Bellafiore",
+      "Steven Dux",
+      "Andrew Aziz",
+      "TraderTV Live",
+      "Humbled Trader",
+      "Timothy Sykes",
+      "Jack Kellogg"
+    ]
+  },
+  "reporting": {
+    "per_trade_default": [
+      "what_and_why",
+      "entry_and_size",
+      "exit_and_risk",
+      "broker_status_and_result"
+    ],
+    "blocker_format": [
+      "BLOCKER",
+      "EVIDENCE",
+      "IMPACT",
+      "KNOWN_GOOD",
+      "LIKELY_ROOT_CAUSE",
+      "ROUTES",
+      "HUMAN_INPUT",
+      "NEXT_TEST"
+    ]
+  },
   "evidence_rules": {
     "no_price_claim_without_timestamped_source": true,
     "no_fill_or_position_claim_without_broker_evidence": true,
     "no_operational_success_from_prompt_or_config_alone": true,
-    "durable_handoff_required": true
+    "research_is_not_execution": true,
+    "durable_handoff_required": true,
+    "restart_recovery_test_required_for_persistence_claim": true,
+    "laptop_off_test_required_for_remote_autonomy_claim": true
   }
 }
