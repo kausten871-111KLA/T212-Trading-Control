@@ -1,0 +1,87 @@
+{
+  "version": "0.1",
+  "workspace": "you-heal-content",
+  "purpose": "Track You Heal production assets and reviews without creating, publishing or scheduling content inside the control plane.",
+  "states": [
+    "TOPIC_BANK",
+    "SCRIPT",
+    "SCIENCE_REVIEW",
+    "BRAND_REVIEW",
+    "RECORDING",
+    "TRANSCRIPT",
+    "EDIT",
+    "CLIPS",
+    "CAPTIONS",
+    "THUMBNAILS",
+    "READY_FOR_APPROVAL",
+    "APPROVED",
+    "PUBLISHED"
+  ],
+  "source_policy": {
+    "source_files_immutable": true,
+    "edits_create_new_version": true,
+    "delete_source_allowed": false,
+    "overwrite_source_allowed": false,
+    "cross_workspace_visibility": false,
+    "public_share_allowed": false
+  },
+  "required_state_fields": [
+    "item_id",
+    "title",
+    "state",
+    "version",
+    "source_refs",
+    "owner",
+    "updated_at",
+    "rights_status",
+    "privacy",
+    "approvals",
+    "checks"
+  ],
+  "checks": {
+    "SCIENCE_REVIEW": [
+      "claims_review_complete",
+      "uncertainty_recorded"
+    ],
+    "BRAND_REVIEW": [
+      "brand_tone_complete",
+      "audience_fit_complete"
+    ],
+    "EDIT": [
+      "visual_quality_reviewed",
+      "audio_quality_reviewed"
+    ],
+    "READY_FOR_APPROVAL": [
+      "claims_review_complete",
+      "brand_tone_complete",
+      "rights_verified",
+      "privacy_reviewed",
+      "visual_quality_reviewed"
+    ]
+  },
+  "approvals": {
+    "APPROVED": [
+      "human_content_approval"
+    ],
+    "PUBLISHED": [
+      "human_content_approval",
+      "human_publish_approval"
+    ]
+  },
+  "actions": {
+    "generate_content_enabled": false,
+    "publish_enabled": false,
+    "schedule_enabled": false,
+    "spend_enabled": false,
+    "external_share_enabled": false
+  },
+  "handoff_fields": [
+    "current_state",
+    "completed_checks",
+    "claims_or_rights_blockers",
+    "blockers",
+    "next_action",
+    "source_refs",
+    "latest_version_ref"
+  ]
+}
