@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "workspace": "t212-demo",
+  "operational_failure_codes": [
+    "DATA",
+    "MARKET",
+    "STRATEGY",
+    "T212_API",
+    "TOOL",
+    "AUTH",
+    "ORCHESTRATION",
+    "EXECUTION",
+    "VERIFICATION",
+    "HUMAN_ACTION"
+  ],
+  "missed_opportunity_codes": [
+    "SCANNER_DETECTION_FAILURE",
+    "QUALIFICATION_LATENCY",
+    "EXECUTION_INTEGRATION_FAILURE",
+    "RULE_THRESHOLD_FALSE_NEGATIVE",
+    "FALSE_POSITIVE_QUALIFICATION_FAILURE",
+    "EXIT_POLICY_FAILURE",
+    "LATE_DETECTION_CHASE_AVOIDED",
+    "UNKNOWN_CAUSE",
+    "DATA_FAILURE",
+    "BROKER_FAILURE"
+  ],
+  "blocked_report_fields": [
+    "BLOCKER",
+    "EVIDENCE",
+    "IMPACT",
+    "KNOWN_GOOD",
+    "LIKELY_ROOT_CAUSE",
+    "ROUTES",
+    "HUMAN_INPUT",
+    "NEXT_TEST"
+  ],
+  "rules": {
+    "rejection_is_valid_terminal_decision_only_with_code_and_evidence": true,
+    "unknown_cause_is_valid": true,
+    "no_silent_retry": true,
+    "no_advancing_past_failed_gate": true,
+    "one_learning_item_per_completed_trade": true
+  }
+}
