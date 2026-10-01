@@ -4,18 +4,24 @@ on:
   pull_request:
     paths:
       - "webui-control/**"
+      - "webui-assets/**"
       - "openwebui/tools/**"
+      - "worker/**"
+      - "scripts/**"
+      - "deploy/**"
       - "tests/**"
-      - "scripts/verify_webui_control.py"
       - ".github/workflows/webui-control-ci.yml"
   push:
     branches:
       - "feature/t212-instrument-cache-v03"
     paths:
       - "webui-control/**"
+      - "webui-assets/**"
       - "openwebui/tools/**"
+      - "worker/**"
+      - "scripts/**"
+      - "deploy/**"
       - "tests/**"
-      - "scripts/verify_webui_control.py"
       - ".github/workflows/webui-control-ci.yml"
 
 permissions:
@@ -39,13 +45,28 @@ jobs:
           python-version: "3.12"
 
       - name: Compile Python sources
-        run: python -m compileall -q openwebui scripts tests
+        run: python -m compileall -q openwebui worker scripts tests
 
       - name: Run complete unit suite
         run: python -m unittest discover -s tests
 
       - name: Run control-plane preflight
         run: python scripts/verify_webui_control.py
+
+      - name: Validate logical workspace runtime contract
+        run: python scripts/validate_workspace_runtime_contract.py
+
+      - name: Audit staged workspace isolation
+        run: python scripts/audit_workspace_isolation.py
+
+      - name: Build repository implementation register
+        run: python scripts/build_implementation_register.py
+
+      - name: Build repository T212 gap register
+        run: python scripts/build_t212_gap_register.py
+
+      - name: Validate empty DEMO programme register safely
+        run: python scripts/build_demo_validation_status.py --ledger /tmp/nonexistent-demo-validation.jsonl
 
       - name: Confirm repository contains no tracked dotenv files
         run: |
