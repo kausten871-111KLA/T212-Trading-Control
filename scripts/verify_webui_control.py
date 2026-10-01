@@ -15,6 +15,7 @@ from openwebui.tools.model_router import validate_router_config
 from openwebui.tools.plugin_registry import validate_registry
 from openwebui.tools.workspace_pipeline import validate_pipeline_config
 from openwebui.tools.credit_control import validate_policy
+from scripts.validate_workspace_runtime_contract import validate as validate_workspace_contract
 
 
 CONFIG_FILES = [
@@ -35,6 +36,9 @@ CONFIG_FILES = [
     "webui-control/t212-risk-controls.json",
     "webui-control/t212-failure-taxonomy.json",
     "webui-control/trade-proposal.schema.json",
+    "webui-control/nontrading-model-bindings.json",
+    "webui-control/workspace-runtime-contract.json",
+    "webui-control/t212-implementation-map.json",
     "webui-control/release-manifest.json",
 ]
 
@@ -177,6 +181,9 @@ def main() -> int:
             validate_risk_controls(configs["webui-control/t212-risk-controls.json"])
             validate_failure_taxonomy(configs["webui-control/t212-failure-taxonomy.json"])
             validate_trade_proposal_schema(configs["webui-control/trade-proposal.schema.json"])
+            workspace_report = validate_workspace_contract()
+            if workspace_report.get("status") != "PASS":
+                raise ValueError("workspace runtime contract validation failed: " + "; ".join(workspace_report.get("failures", [])))
             target = configs["webui-control/server-target.json"]
             report["server_target"] = {
                 "repository_checkout": target["repository_checkout"],
