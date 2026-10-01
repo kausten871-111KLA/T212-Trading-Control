@@ -1,9 +1,10 @@
 [Unit]
-Description=Daily T212 instrument cache refresh
+Description=Daily T212 DEMO instrument cache refresh
 
 [Timer]
-OnCalendar=Mon..Fri 07:15
+OnCalendar=Mon..Fri 07:15 Europe/London
 Persistent=true
+AccuracySec=30s
 Unit=t212-cache-refresh.service
 
 [Install]
