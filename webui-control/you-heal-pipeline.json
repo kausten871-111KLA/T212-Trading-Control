@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "workspace": "you-heal-content",
   "purpose": "Track You Heal production assets and reviews without creating, publishing or scheduling content inside the control plane.",
   "states": [
@@ -83,5 +83,11 @@
     "next_action",
     "source_refs",
     "latest_version_ref"
-  ]
+  ],
+  "transition_policy": {
+    "sequential_only": true,
+    "skip_forward_states_allowed": false,
+    "backward_revision_requires_explicit_workflow": true,
+    "published_state_disabled_in_control_plane": true
+  }
 }
