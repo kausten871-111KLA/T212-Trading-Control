@@ -49,6 +49,7 @@ class WorkspacePipelineTests(unittest.TestCase):
 
     def test_books_ready_requires_quality_and_rights_checks(self):
         source = item(
+            state="LAYOUT",
             checks={
                 "continuity_complete": True,
                 "fact_check_complete": True,
@@ -61,7 +62,7 @@ class WorkspacePipelineTests(unittest.TestCase):
 
     def test_you_heal_ready_requires_claims_brand_rights_privacy_and_visual_checks(self):
         source = item(
-            state="EDIT",
+            state="THUMBNAILS",
             checks={
                 "claims_review_complete": True,
                 "brand_tone_complete": True,
@@ -75,6 +76,7 @@ class WorkspacePipelineTests(unittest.TestCase):
 
     def test_transition_creates_new_record_without_mutating_source(self):
         source = item(
+            state="LAYOUT",
             checks={
                 "continuity_complete": True,
                 "fact_check_complete": True,
@@ -98,6 +100,10 @@ class WorkspacePipelineTests(unittest.TestCase):
     def test_version_skip_is_rejected(self):
         with self.assertRaises(PipelineValidationError):
             transition_item(BOOKS, item(), "RESEARCH", 3)
+
+    def test_forward_state_skip_is_rejected(self):
+        with self.assertRaises(PipelineValidationError):
+            transition_item(BOOKS, item(state="DRAFT"), "READY_FOR_APPROVAL", 2)
 
     def test_approval_state_requires_human_content_approval(self):
         source = item(state="READY_FOR_APPROVAL")
