@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 from openwebui.tools.model_router import validate_router_config
 from openwebui.tools.plugin_registry import validate_registry
 from openwebui.tools.workspace_pipeline import validate_pipeline_config
+from openwebui.tools.credit_control import validate_policy
 
 
 CONFIG_FILES = [
@@ -27,6 +28,7 @@ CONFIG_FILES = [
     "webui-control/books-pipeline.json",
     "webui-control/you-heal-pipeline.json",
     "webui-control/dashboard-schema.json",
+    "webui-control/credit-policy.json",
     "webui-control/release-manifest.json",
 ]
 
@@ -65,6 +67,7 @@ def main() -> int:
             validate_registry(configs["webui-control/plugin-registry.json"])
             validate_pipeline_config(configs["webui-control/books-pipeline.json"])
             validate_pipeline_config(configs["webui-control/you-heal-pipeline.json"])
+            validate_policy(configs["webui-control/credit-policy.json"])
         except ValueError as exc:
             report["failures"].append(f"control config: {exc}")
 
