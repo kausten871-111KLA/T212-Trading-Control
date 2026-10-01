@@ -29,6 +29,7 @@ CONFIG_FILES = [
     "webui-control/you-heal-pipeline.json",
     "webui-control/dashboard-schema.json",
     "webui-control/credit-policy.json",
+    "webui-control/morning-human-actions.json",
     "webui-control/release-manifest.json",
 ]
 
