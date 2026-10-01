@@ -1,37 +1,62 @@
 #!/usr/bin/env python3
-"""End-of-day missed-green audit runner. No orders."""
-import json, os
+"""End-of-day missed-green audit runner. Read-only; never submits orders."""
+from __future__ import annotations
+
+import json
+import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-STATE=Path(os.getenv("T212_SCANNER_STATE_DIR","/var/lib/t212-scanner"))
-OUT=STATE/"eod_audit_latest.json"
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-def load_json(path,default):
-    try:return json.loads(Path(path).read_text(encoding="utf-8"))
-    except Exception:return default
+from openwebui.tools.missed_green_audit import MissedGreenAudit
 
-def main():
-    actual=load_json(STATE/"actual_movers.json",[])
-    surfaced=load_json(STATE/"surfaced_candidates.json",[])
-    traded=load_json(STATE/"broker_fills.json",[])
-    sm={str(x.get("t212_ticker") or x.get("symbol") or "").upper():x for x in surfaced}
-    tm={str(x.get("t212_ticker") or x.get("symbol") or "").upper():x for x in traded}
-    rows=[]
-    for mover in actual[:100]:
-        key=str(mover.get("t212_ticker") or mover.get("symbol") or "").upper()
-        s=sm.get(key); t=tm.get(key)
-        if not s: code,reason="NEV","never surfaced"
-        elif t: code,reason="TRADED","broker-confirmed trade exists"
-        elif s.get("scanner_state")=="rejected": code,reason="RET","surfaced but rejected by deterministic gate"
-        elif s.get("catalyst_state") in ("unknown","unverified","none"): code,reason="AVOIDED","surfaced without verified catalyst"
-        else: code,reason="NOTRADED","surfaced and qualified but not traded"
-        rows.append({"symbol":mover.get("symbol"),"change_pct":mover.get("change_pct"),"audit_code":code,"audit_reason":reason})
-    counts={}
-    for r in rows:counts[r["audit_code"]]=counts.get(r["audit_code"],0)+1
-    payload={"ts":datetime.now(timezone.utc).isoformat(),"counts":counts,"rows":rows,"orders_submitted":0}
-    OUT.parent.mkdir(parents=True,exist_ok=True)
-    OUT.write_text(json.dumps(payload,indent=2),encoding="utf-8")
-    print(json.dumps({"ok":True,"counts":counts}))
+STATE = Path(os.getenv("T212_SCANNER_STATE_DIR", "/var/lib/t212-scanner"))
+OUT = STATE / "eod_audit_latest.json"
+
+
+def load_json(path: Path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def atomic_json(path: Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def main() -> int:
+    actual = load_json(STATE / "actual_movers.json", [])
+    surfaced = load_json(STATE / "surfaced_candidates.json", [])
+    traded = load_json(STATE / "broker_fills.json", [])
+
+    audit = MissedGreenAudit(top_n=100).classify(actual, surfaced, traded)
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "environment": "DEMO",
+        "actual_mover_count": len(actual) if isinstance(actual, list) else 0,
+        "surfaced_count": len(surfaced) if isinstance(surfaced, list) else 0,
+        "broker_fill_count": len(traded) if isinstance(traded, list) else 0,
+        "audit": audit,
+        "orders_submitted": 0,
+        "live_trading_enabled": False,
+    }
+    atomic_json(OUT, payload)
+    print(json.dumps({
+        "ok": True,
+        "environment": "DEMO",
+        "audit_version": audit["auditVersion"],
+        "counts": audit["counts"],
+        "orders_submitted": 0,
+    }, sort_keys=True))
     return 0
-if __name__=="__main__":raise SystemExit(main())
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
