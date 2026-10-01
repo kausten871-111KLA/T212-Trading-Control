@@ -54,6 +54,11 @@
       "id": "credit-control",
       "config": "webui-control/credit-policy.json",
       "code": "openwebui/tools/credit_control.py"
+    },
+    {
+      "id": "server-deployment-preflight",
+      "config": null,
+      "code": "scripts/server_deployment_preflight.py"
     }
   ],
   "gates": {
