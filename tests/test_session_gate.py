@@ -1,4 +1,3 @@
-import importlib.util
 import json
 import tempfile
 import unittest
@@ -9,11 +8,8 @@ from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
-GATE_PATH = ROOT / "worker" / "session_gate.py"
-SPEC = importlib.util.spec_from_file_location("session_gate", GATE_PATH)
-GATE = importlib.util.module_from_spec(SPEC)
-assert SPEC and SPEC.loader
-SPEC.loader.exec_module(GATE)
+
+from worker import session_gate as GATE
 
 
 class SessionGateTests(unittest.TestCase):
