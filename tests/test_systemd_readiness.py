@@ -18,9 +18,16 @@ class SystemdReadinessTests(unittest.TestCase):
         self.assertRegex(cache, r"(?m)^OnCalendar=.*Europe/London$")
         self.assertRegex(eod, r"(?m)^OnCalendar=.*Europe/London$")
 
-    def test_discovery_cadence_is_timezone_independent(self):
+    def test_discovery_timer_has_explicit_uk_outer_window(self):
         discovery = self.read("t212-discovery.timer")
-        self.assertIn("OnCalendar=*:0/5", discovery)
+        expected = (
+            "OnCalendar=Mon..Fri *-*-* 14:20/5:00 Europe/London",
+            "OnCalendar=Mon..Fri *-*-* 15..20:00/5:00 Europe/London",
+            "OnCalendar=Mon..Fri *-*-* 21:00..05/5:00 Europe/London",
+        )
+        for calendar in expected:
+            self.assertIn(calendar, discovery)
+        self.assertNotIn("OnCalendar=*:0/5", discovery)
         self.assertIn("Persistent=true", discovery)
 
     def test_all_worker_services_are_bounded_and_retry_failures(self):
