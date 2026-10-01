@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "workspace": "t212-demo",
+  "environment": "DEMO",
+  "source": "Recovered Shared Portfolio Ledger and 22 Sep EOD control envelope",
+  "controls": {
+    "planned_loss_per_trade": {"rule":"lower_of","equity_pct":1.0,"absolute_gbp":3.0},
+    "position_value": {"rule":"lower_of","equity_pct":25.0,"absolute_gbp":75.0},
+    "max_concurrent_positions": 3,
+    "aggregate_open_risk": {"rule":"lower_of","equity_pct":3.0,"absolute_gbp":9.0},
+    "daily_loss_stop": {"rule":"lower_of","starting_daily_equity_pct":2.0,"absolute_gbp":6.0},
+    "weekly_loss_stop": {"rule":"lower_of","starting_weekly_equity_pct":4.0,"absolute_gbp":12.0},
+    "experiment_drawdown_stop": {"rule":"lower_of","high_water_equity_pct":10.0,"absolute_gbp":30.0},
+    "minimum_reward_risk_to_first_target": 2.0,
+    "normal_session_spread_ceiling_pct_midpoint": 2.5,
+    "max_expected_friction_pct_planned_risk": 25.0,
+    "proposal_validity_seconds": 900,
+    "reprice_rescale_if_reference_price_move_pct": 1.0,
+    "overnight_holding_default": false,
+    "long_only": true,
+    "shorting": false,
+    "leverage": false,
+    "cfds": false,
+    "averaging_down": false,
+    "martingale": false,
+    "revenge_or_loss_chasing": false
+  },
+  "portfolio_authority": {
+    "broker_truth_authoritative": true,
+    "shared_cash_risk_positions_pool": true,
+    "uk_us_controllers_share_one_ledger": true,
+    "pending_commitments_reduce_available_cash": true,
+    "candidate_reservations_reduce_available_cash": true,
+    "legacy_positions_do_not_authorize_new_sizing": true,
+    "reconcile_on_startup": true,
+    "reconcile_after_restart": true,
+    "reconcile_after_every_broker_write": true,
+    "prefer_consolidated_operations_dashboard": true,
+    "avoid_parallel_broker_reconciliation_bursts": true
+  }
+}
