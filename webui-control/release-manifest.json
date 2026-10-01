@@ -34,6 +34,16 @@
       "id": "shift-handoff",
       "config": "webui-control/shift-handoff-schema.json",
       "code": "openwebui/tools/shift_handoff.py"
+    },
+    {
+      "id": "books-pipeline",
+      "config": "webui-control/books-pipeline.json",
+      "code": "openwebui/tools/workspace_pipeline.py"
+    },
+    {
+      "id": "you-heal-pipeline",
+      "config": "webui-control/you-heal-pipeline.json",
+      "code": "openwebui/tools/workspace_pipeline.py"
     }
   ],
   "gates": {
