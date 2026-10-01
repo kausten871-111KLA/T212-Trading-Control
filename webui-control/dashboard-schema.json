@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "webui-control/dashboard-schema.json",
+  "title": "WebUI Executive Dashboard Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "generated_at",
+    "overall_status",
+    "workspace_order",
+    "workspaces",
+    "totals",
+    "t212_safety"
+  ],
+  "properties": {
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "overall_status": {
+      "enum": [
+        "HEALTHY",
+        "ATTENTION",
+        "DEGRADED",
+        "NO_DATA"
+      ]
+    },
+    "workspace_order": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "t212-demo",
+          "apps-plugins-bots",
+          "you-heal-content",
+          "books-publishing"
+        ]
+      },
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true
+    },
+    "workspaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "t212-demo",
+        "apps-plugins-bots",
+        "you-heal-content",
+        "books-publishing"
+      ],
+      "properties": {
+        "t212-demo": {
+          "$ref": "#/$defs/panel"
+        },
+        "apps-plugins-bots": {
+          "$ref": "#/$defs/panel"
+        },
+        "you-heal-content": {
+          "$ref": "#/$defs/panel"
+        },
+        "books-publishing": {
+          "$ref": "#/$defs/panel"
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verified_runs",
+        "failed",
+        "blocked",
+        "running",
+        "stale",
+        "pending_approvals"
+      ],
+      "properties": {
+        "verified_runs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "running": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stale": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending_approvals": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "costs_by_unit": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "t212_safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "environment",
+        "live_trading",
+        "order_mutation"
+      ],
+      "properties": {
+        "environment": {
+          "const": "DEMO"
+        },
+        "live_trading": {
+          "const": false
+        },
+        "order_mutation": {
+          "const": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "panel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "summary",
+        "run_counts",
+        "blockers",
+        "pending_approvals",
+        "next_actions",
+        "artifacts",
+        "last_handoff_at"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "HEALTHY",
+            "ATTENTION",
+            "DEGRADED",
+            "NO_DATA"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "run_counts": {
+          "type": "object"
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "pending_approvals": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "next_actions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "last_handoff_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
