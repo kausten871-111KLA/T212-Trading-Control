@@ -17,7 +17,7 @@ def load(relative: str) -> dict[str, Any]:
     return json.loads((ROOT / relative).read_text(encoding="utf-8"))
 
 
-def main() -> int:
+def audit() -> dict[str, Any]:
     registry = load("webui-control/plugin-registry.json")
     bindings = load("webui-control/nontrading-model-bindings.json")
     failures = []
@@ -51,14 +51,18 @@ def main() -> int:
     if policy.get("additive_only") is not True:
         failures.append("non-trading model bindings must remain additive-only")
 
-    return_code = 0 if not failures else 1
-    print(json.dumps({
+    return {
         "status": "PASS" if not failures else "FAIL",
         "runtime_proof": False,
         "checks": checks,
         "failures": failures,
-    }, indent=2, sort_keys=True))
-    return return_code
+    }
+
+
+def main() -> int:
+    result = audit()
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if result["status"] == "PASS" else 1
 
 
 if __name__ == "__main__":
