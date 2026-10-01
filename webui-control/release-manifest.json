@@ -49,6 +49,11 @@
       "id": "dashboard-snapshot",
       "config": "webui-control/dashboard-schema.json",
       "code": "openwebui/tools/dashboard_snapshot.py"
+    },
+    {
+      "id": "credit-control",
+      "config": "webui-control/credit-policy.json",
+      "code": "openwebui/tools/credit_control.py"
     }
   ],
   "gates": {
