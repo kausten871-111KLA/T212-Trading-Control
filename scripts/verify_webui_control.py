@@ -32,6 +32,9 @@ CONFIG_FILES = [
     "webui-control/morning-human-actions.json",
     "webui-control/server-target.json",
     "webui-control/t212-methodology.json",
+    "webui-control/t212-risk-controls.json",
+    "webui-control/t212-failure-taxonomy.json",
+    "webui-control/trade-proposal.schema.json",
     "webui-control/release-manifest.json",
 ]
 
@@ -90,6 +93,50 @@ def validate_t212_methodology(config: dict) -> None:
     evidence = config.get("evidence_rules") or {}
     if evidence.get("no_operational_success_from_prompt_or_config_alone") is not True:
         raise ValueError("T212 evidence rules must reject prompt-only success claims")
+    if evidence.get("no_fill_or_position_claim_without_broker_evidence") is not True:
+        raise ValueError("T212 evidence rules must require broker verification")
+
+
+def validate_risk_controls(config: dict) -> None:
+    if config.get("environment") != "DEMO":
+        raise ValueError("risk controls must remain DEMO")
+    controls = config.get("controls") or {}
+    if controls.get("long_only") is not True or controls.get("shorting") is not False:
+        raise ValueError("risk controls must remain long-only with shorting disabled")
+    if controls.get("max_concurrent_positions") != 3:
+        raise ValueError("recovered max concurrent position control drifted")
+    if float(controls.get("normal_session_spread_ceiling_pct_midpoint", -1)) != 2.5:
+        raise ValueError("recovered spread ceiling drifted")
+    if controls.get("averaging_down") is not False:
+        raise ValueError("averaging down must remain disabled")
+    authority = config.get("portfolio_authority") or {}
+    if authority.get("broker_truth_authoritative") is not True:
+        raise ValueError("broker truth must remain authoritative")
+    if authority.get("shared_cash_risk_positions_pool") is not True:
+        raise ValueError("UK/US controllers must share one cash/risk pool")
+
+
+def validate_failure_taxonomy(config: dict) -> None:
+    required = {"DATA", "MARKET", "STRATEGY", "T212_API", "TOOL", "AUTH", "ORCHESTRATION", "EXECUTION", "VERIFICATION", "HUMAN_ACTION"}
+    if not required.issubset(set(config.get("operational_failure_codes") or [])):
+        raise ValueError("operational failure taxonomy is incomplete")
+    rules = config.get("rules") or {}
+    if rules.get("no_silent_retry") is not True:
+        raise ValueError("failure taxonomy must prohibit silent retry")
+    if rules.get("no_advancing_past_failed_gate") is not True:
+        raise ValueError("failure taxonomy must stop at failed gate")
+
+
+def validate_trade_proposal_schema(config: dict) -> None:
+    required = set(config.get("required") or [])
+    for field in ("proposal_id", "t212_ticker", "catalyst_evidence", "risk_stop", "approval_state", "execution_state", "safety"):
+        if field not in required:
+            raise ValueError(f"trade proposal schema missing {field}")
+    safety = ((config.get("properties") or {}).get("safety") or {}).get("properties") or {}
+    if (safety.get("environment") or {}).get("const") != "DEMO":
+        raise ValueError("trade proposal schema must constrain environment to DEMO")
+    if (safety.get("live_trading") or {}).get("const") is not False:
+        raise ValueError("trade proposal schema must constrain LIVE trading to false")
 
 
 def main() -> int:
@@ -107,6 +154,7 @@ def main() -> int:
         },
         "server_target": {},
         "methodology_version": None,
+        "risk_controls_version": None,
     }
 
     configs: dict[str, dict] = {}
@@ -126,6 +174,9 @@ def main() -> int:
             validate_policy(configs["webui-control/credit-policy.json"])
             validate_server_target(configs["webui-control/server-target.json"])
             validate_t212_methodology(configs["webui-control/t212-methodology.json"])
+            validate_risk_controls(configs["webui-control/t212-risk-controls.json"])
+            validate_failure_taxonomy(configs["webui-control/t212-failure-taxonomy.json"])
+            validate_trade_proposal_schema(configs["webui-control/trade-proposal.schema.json"])
             target = configs["webui-control/server-target.json"]
             report["server_target"] = {
                 "repository_checkout": target["repository_checkout"],
@@ -133,7 +184,8 @@ def main() -> int:
                 "state_target": target["state_target"],
             }
             report["methodology_version"] = configs["webui-control/t212-methodology.json"].get("version")
-        except ValueError as exc:
+            report["risk_controls_version"] = configs["webui-control/t212-risk-controls.json"].get("version")
+        except (ValueError, TypeError) as exc:
             report["failures"].append(f"control config: {exc}")
 
     manifest = configs.get("webui-control/release-manifest.json", {})
