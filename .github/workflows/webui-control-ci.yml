@@ -1,0 +1,56 @@
+name: WebUI Control Plane CI
+
+on:
+  pull_request:
+    paths:
+      - "webui-control/**"
+      - "openwebui/tools/**"
+      - "tests/**"
+      - "scripts/verify_webui_control.py"
+      - ".github/workflows/webui-control-ci.yml"
+  push:
+    branches:
+      - "feature/t212-instrument-cache-v03"
+    paths:
+      - "webui-control/**"
+      - "openwebui/tools/**"
+      - "tests/**"
+      - "scripts/verify_webui_control.py"
+      - ".github/workflows/webui-control-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webui-control-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Compile Python sources
+        run: python -m compileall -q openwebui scripts tests
+
+      - name: Run complete unit suite
+        run: python -m unittest discover -s tests
+
+      - name: Run control-plane preflight
+        run: python scripts/verify_webui_control.py
+
+      - name: Confirm repository contains no tracked dotenv files
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)'; then
+            echo "Tracked dotenv file detected; refusing validation."
+            exit 1
+          fi
