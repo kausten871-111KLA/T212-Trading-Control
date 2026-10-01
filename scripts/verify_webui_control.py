@@ -30,6 +30,7 @@ CONFIG_FILES = [
     "webui-control/dashboard-schema.json",
     "webui-control/credit-policy.json",
     "webui-control/morning-human-actions.json",
+    "webui-control/server-target.json",
     "webui-control/release-manifest.json",
 ]
 
@@ -37,6 +38,25 @@ CONFIG_FILES = [
 def load_json(relative: str) -> dict:
     with (ROOT / relative).open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def validate_server_target(config: dict) -> None:
+    required = (
+        "repository_checkout",
+        "runtime_target",
+        "state_target",
+        "openwebui_container",
+        "openwebui_data_dir",
+    )
+    missing = [key for key in required if not config.get(key)]
+    if missing:
+        raise ValueError(f"server target missing fields: {', '.join(missing)}")
+    for key in ("repository_checkout", "runtime_target", "state_target", "openwebui_data_dir"):
+        value = config[key]
+        if not isinstance(value, str) or not value.startswith("/") or ".." in Path(value).parts:
+            raise ValueError(f"server target has unsafe path for {key}")
+    if config["repository_checkout"] == config["runtime_target"]:
+        raise ValueError("server target must distinguish source checkout from runtime target")
 
 
 def main() -> int:
@@ -52,6 +72,7 @@ def main() -> int:
             "live_trading": False,
             "order_mutation": False,
         },
+        "server_target": {},
     }
 
     configs: dict[str, dict] = {}
@@ -69,6 +90,13 @@ def main() -> int:
             validate_pipeline_config(configs["webui-control/books-pipeline.json"])
             validate_pipeline_config(configs["webui-control/you-heal-pipeline.json"])
             validate_policy(configs["webui-control/credit-policy.json"])
+            validate_server_target(configs["webui-control/server-target.json"])
+            target = configs["webui-control/server-target.json"]
+            report["server_target"] = {
+                "repository_checkout": target["repository_checkout"],
+                "runtime_target": target["runtime_target"],
+                "state_target": target["state_target"],
+            }
         except ValueError as exc:
             report["failures"].append(f"control config: {exc}")
 
