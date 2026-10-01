@@ -1,0 +1,107 @@
+{
+  "version": "1.0",
+  "workspace": "t212-demo",
+  "purpose": "Canonical durable operating requirements recovered from user directives. This file is descriptive governance and does not authorize order submission.",
+  "safety": {
+    "environment": "DEMO",
+    "live_trading": false,
+    "order_mutation_during_control_validation": false,
+    "human_approval_required_for_order_proposals": true,
+    "broker_evidence_required_for_execution_claims": true,
+    "fail_closed_on_stale_or_missing_data": true
+  },
+  "discovery": {
+    "broad_universe": true,
+    "signals": [
+      "positive_movers",
+      "unusual_relative_volume",
+      "momentum",
+      "volatility",
+      "pre_market_when_supported",
+      "new_to_market_when_supported",
+      "sector_theme_moves",
+      "penny_stock_opportunities",
+      "larger_liquid_opportunities"
+    ],
+    "gates": [
+      "t212_tradability",
+      "instrument_type",
+      "asset_status",
+      "liquidity",
+      "spread",
+      "data_freshness"
+    ],
+    "cache_first_instrument_lookup": true
+  },
+  "cause_effect": {
+    "sequence": [
+      "mover",
+      "catalyst",
+      "source_verification",
+      "business_or_financial_impact",
+      "price_response",
+      "tradability"
+    ],
+    "source_evidence_required": true,
+    "preferred_source_count_per_sector": "2-5"
+  },
+  "proposal_fields": [
+    "symbol",
+    "timestamp",
+    "data_source",
+    "data_age",
+    "reason",
+    "catalyst_evidence",
+    "entry_range",
+    "profit_targets",
+    "risk_stop",
+    "holding_period",
+    "liquidity",
+    "spread",
+    "volatility",
+    "dilution_or_manipulation_risk",
+    "confidence_evidence_level",
+    "broker_tradability",
+    "approval_state",
+    "execution_state"
+  ],
+  "lifecycle": [
+    "DISCOVERY",
+    "QUALIFICATION",
+    "CATALYST_VERIFIED",
+    "RISK_GATED",
+    "PROPOSAL",
+    "HUMAN_APPROVAL",
+    "DEMO_EXECUTION",
+    "BROKER_VERIFICATION",
+    "MONITORING",
+    "EXIT",
+    "REVIEW"
+  ],
+  "learning": {
+    "missed_greens_review": true,
+    "audit_reasons": [
+      "not_discovered",
+      "discovered_too_late",
+      "rejected_by_filter",
+      "stale_data",
+      "catalyst_not_confirmed",
+      "liquidity_or_spread_rejection",
+      "human_approval_absent",
+      "technical_failure"
+    ],
+    "feedback_to_discovery": true,
+    "automatic_gate_weakening": false
+  },
+  "operating_windows": [
+    "UK_OPEN",
+    "US_OPEN",
+    "US_CLOSE"
+  ],
+  "evidence_rules": {
+    "no_price_claim_without_timestamped_source": true,
+    "no_fill_or_position_claim_without_broker_evidence": true,
+    "no_operational_success_from_prompt_or_config_alone": true,
+    "durable_handoff_required": true
+  }
+}
