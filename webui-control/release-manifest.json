@@ -59,6 +59,11 @@
       "id": "server-deployment-preflight",
       "config": null,
       "code": "scripts/server_deployment_preflight.py"
+    },
+    {
+      "id": "morning-human-action-pack",
+      "config": "webui-control/morning-human-actions.json",
+      "code": "scripts/build_morning_handoff.py"
     }
   ],
   "gates": {
