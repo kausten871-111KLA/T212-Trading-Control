@@ -1,0 +1,102 @@
+{
+  "version": "0.1",
+  "workspace": "t212-demo",
+  "requirements": [
+    {
+      "id": "broad_discovery",
+      "requirement": "Scan a broad universe for greens, unusual volume, momentum, volatility and supported new-market/thematic signals.",
+      "config_refs": ["webui-control/t212-methodology.json"],
+      "code_refs": ["worker/discovery_adapter.py", "worker/run_discovery_cycle.py", "openwebui/tools/deterministic_opportunity_scanner.py"],
+      "runtime_evidence_keys": ["discovery-worker", "discovery-adapter"],
+      "known_gap": "Market snapshot producer is not yet runtime-proven on Contabo."
+    },
+    {
+      "id": "instrument_cache",
+      "requirement": "Use fresh Trading212 DEMO instrument metadata with deterministic symbol mapping and invalid-instrument rejection.",
+      "config_refs": ["webui-control/t212-methodology.json"],
+      "code_refs": ["scripts/refresh_t212_cache_worker.py", "openwebui/tools/t212_instrument_cache.py", "worker/discovery_adapter.py"],
+      "runtime_evidence_keys": ["discovery-adapter"],
+      "known_gap": "Cache refresh has not been re-run and evidenced against current branch."
+    },
+    {
+      "id": "cause_effect",
+      "requirement": "Map mover to catalyst, source verification, business/financial effect, price response and tradability.",
+      "config_refs": ["webui-control/t212-methodology.json"],
+      "code_refs": ["openwebui/tools/catalyst_handoff_queue.py"],
+      "runtime_evidence_keys": [],
+      "known_gap": "Catalyst queue exists but automatic evidence verification is not runtime-proven."
+    },
+    {
+      "id": "qualification_and_risk",
+      "requirement": "Apply explicit qualification states and deterministic recovered risk controls.",
+      "config_refs": ["webui-control/t212-methodology.json", "webui-control/t212-risk-controls.json"],
+      "code_refs": ["openwebui/tools/t212_risk_gate.py", "openwebui/tools/deterministic_opportunity_scanner.py"],
+      "runtime_evidence_keys": [],
+      "known_gap": "Risk gate is built but not yet wired into live Trading Operations handoff."
+    },
+    {
+      "id": "proposal_contract",
+      "requirement": "Every proposal includes source freshness, evidence, entry/targets/stop, liquidity/spread/volatility, exposure, ticker and approval/execution state.",
+      "config_refs": ["webui-control/trade-proposal.schema.json"],
+      "code_refs": [],
+      "runtime_evidence_keys": [],
+      "known_gap": "Schema is built but live proposal generation has not yet been validated against it."
+    },
+    {
+      "id": "state_machine",
+      "requirement": "Separate discovery, qualification, evidence, risk, proposal, approval, DEMO execution, broker verification, monitoring, exit and review.",
+      "config_refs": ["webui-control/t212-methodology.json"],
+      "code_refs": ["openwebui/tools/trading_state_machine.py"],
+      "runtime_evidence_keys": [],
+      "known_gap": "State validator is built but not yet wired into live executor handoffs."
+    },
+    {
+      "id": "broker_truth",
+      "requirement": "Never claim ordered/filled/closed without broker evidence; never blind-retry non-idempotent order POSTs.",
+      "config_refs": ["webui-control/t212-methodology.json", "webui-control/t212-risk-controls.json"],
+      "code_refs": ["openwebui/tools/trading_state_machine.py"],
+      "runtime_evidence_keys": [],
+      "known_gap": "Historically verified in local Gateway; remote current-state proof still required."
+    },
+    {
+      "id": "shared_portfolio_authority",
+      "requirement": "UK and US controllers share one broker-mirrored cash/risk/positions pool and reconcile after restart/writes.",
+      "config_refs": ["webui-control/t212-risk-controls.json"],
+      "code_refs": [],
+      "runtime_evidence_keys": [],
+      "known_gap": "Shared Portfolio Ledger skill exists locally but remote attachment/runtime state is unproven."
+    },
+    {
+      "id": "missed_greens",
+      "requirement": "Audit material missed movers with canonical root-cause codes and feed one learning item back.",
+      "config_refs": ["webui-control/t212-failure-taxonomy.json", "webui-control/t212-methodology.json"],
+      "code_refs": ["worker/run_eod_audit.py", "openwebui/tools/missed_green_audit.py"],
+      "runtime_evidence_keys": [],
+      "known_gap": "Existing EOD worker still uses legacy shorthand codes; alignment patch remains outstanding."
+    },
+    {
+      "id": "worker_reliability",
+      "requirement": "Persistent worker must expose freshness, failures, stale state and evidence rather than placeholder success.",
+      "config_refs": ["webui-control/t212-methodology.json"],
+      "code_refs": ["worker/run_discovery_cycle.py", "worker/healthcheck.py"],
+      "runtime_evidence_keys": ["discovery-worker"],
+      "known_gap": "Current branch worker has not yet been synchronized/tested on Contabo."
+    },
+    {
+      "id": "runtime_evidence",
+      "requirement": "Configured components cannot be labelled operational without runtime evidence.",
+      "config_refs": ["webui-control/release-manifest.json"],
+      "code_refs": ["scripts/collect_runtime_evidence.py", "scripts/build_implementation_register.py"],
+      "runtime_evidence_keys": [],
+      "known_gap": "Collector is built but must be run on the remote server after branch synchronization."
+    },
+    {
+      "id": "twenty_demo_validation",
+      "requirement": "Validate process over 20 controlled DEMO trades without forcing profit or bypassing approval/risk controls.",
+      "config_refs": ["webui-control/t212-methodology.json"],
+      "code_refs": [],
+      "runtime_evidence_keys": [],
+      "known_gap": "Validation programme is defined but not currently being counted by a durable run register."
+    }
+  ]
+}
