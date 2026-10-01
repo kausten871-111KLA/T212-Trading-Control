@@ -156,7 +156,12 @@ def collect(repo_dir: Path, container: str, data_dir: str) -> dict[str, Any]:
     manifest_path = repo_dir / "webui-control" / "release-manifest.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        safety = manifest.get("safety", {})
+        trading_safety = manifest.get("trading_safety", {})
+        safety = {
+            "environment": trading_safety.get("environment"),
+            "live_trading_enabled": trading_safety.get("live_trading"),
+            "order_mutation_enabled": trading_safety.get("order_mutation_during_control_plane_validation"),
+        }
     except (OSError, json.JSONDecodeError):
         pass
 
