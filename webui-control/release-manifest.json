@@ -1,84 +1,38 @@
 {
-  "version": "0.2",
+  "version": "0.3",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
   "source_branch": "feature/t212-instrument-cache-v03",
   "components": [
-    {
-      "id": "workspace-registry",
-      "config": "webui-control/workspaces.json",
-      "code": null
-    },
-    {
-      "id": "agent-contract",
-      "config": "webui-control/agent-contract.json",
-      "code": null
-    },
-    {
-      "id": "model-router",
-      "config": "webui-control/model-router.json",
-      "code": "openwebui/tools/model_router.py"
-    },
-    {
-      "id": "plugin-registry",
-      "config": "webui-control/plugin-registry.json",
-      "code": "openwebui/tools/plugin_registry.py"
-    },
-    {
-      "id": "automation-ledger",
-      "config": "webui-control/automation-run-schema.json",
-      "code": "openwebui/tools/automation_ledger.py"
-    },
-    {
-      "id": "shift-handoff",
-      "config": "webui-control/shift-handoff-schema.json",
-      "code": "openwebui/tools/shift_handoff.py"
-    },
-    {
-      "id": "books-pipeline",
-      "config": "webui-control/books-pipeline.json",
-      "code": "openwebui/tools/workspace_pipeline.py"
-    },
-    {
-      "id": "you-heal-pipeline",
-      "config": "webui-control/you-heal-pipeline.json",
-      "code": "openwebui/tools/workspace_pipeline.py"
-    },
-    {
-      "id": "dashboard-snapshot",
-      "config": "webui-control/dashboard-schema.json",
-      "code": "openwebui/tools/dashboard_snapshot.py"
-    },
-    {
-      "id": "credit-control",
-      "config": "webui-control/credit-policy.json",
-      "code": "openwebui/tools/credit_control.py"
-    },
-    {
-      "id": "server-target",
-      "config": "webui-control/server-target.json",
-      "code": null
-    },
-    {
-      "id": "server-deployment-preflight",
-      "config": null,
-      "code": "scripts/server_deployment_preflight.py"
-    },
-    {
-      "id": "morning-human-action-pack",
-      "config": "webui-control/morning-human-actions.json",
-      "code": "scripts/build_morning_handoff.py"
-    }
+    {"id":"workspace-registry","config":"webui-control/workspaces.json","code":null},
+    {"id":"agent-contract","config":"webui-control/agent-contract.json","code":null},
+    {"id":"model-router","config":"webui-control/model-router.json","code":"openwebui/tools/model_router.py"},
+    {"id":"plugin-registry","config":"webui-control/plugin-registry.json","code":"openwebui/tools/plugin_registry.py"},
+    {"id":"automation-ledger","config":"webui-control/automation-run-schema.json","code":"openwebui/tools/automation_ledger.py"},
+    {"id":"shift-handoff","config":"webui-control/shift-handoff-schema.json","code":"openwebui/tools/shift_handoff.py"},
+    {"id":"books-pipeline","config":"webui-control/books-pipeline.json","code":"openwebui/tools/workspace_pipeline.py"},
+    {"id":"you-heal-pipeline","config":"webui-control/you-heal-pipeline.json","code":"openwebui/tools/workspace_pipeline.py"},
+    {"id":"dashboard-snapshot","config":"webui-control/dashboard-schema.json","code":"openwebui/tools/dashboard_snapshot.py"},
+    {"id":"credit-control","config":"webui-control/credit-policy.json","code":"openwebui/tools/credit_control.py"},
+    {"id":"server-target","config":"webui-control/server-target.json","code":null},
+    {"id":"t212-methodology","config":"webui-control/t212-methodology.json","code":null},
+    {"id":"discovery-adapter","config":null,"code":"worker/discovery_adapter.py"},
+    {"id":"discovery-worker","config":null,"code":"worker/run_discovery_cycle.py"},
+    {"id":"implementation-register","config":null,"code":"scripts/build_implementation_register.py"},
+    {"id":"server-deployment-preflight","config":null,"code":"scripts/server_deployment_preflight.py"},
+    {"id":"morning-human-action-pack","config":"webui-control/morning-human-actions.json","code":"scripts/build_morning_handoff.py"}
   ],
   "gates": {
     "tests_command": "python -m unittest discover -s tests",
     "preflight_command": "python scripts/verify_webui_control.py",
+    "implementation_register_command": "python scripts/build_implementation_register.py",
     "require_clean_test_exit": true,
     "require_exact_commit_checkout": true,
     "require_backup_evidence_before_deploy": true,
     "require_human_approval_before_deploy": true,
-    "forbid_secrets_in_repository": true
+    "forbid_secrets_in_repository": true,
+    "require_runtime_evidence_for_proven_status": true
   },
   "trading_safety": {
     "environment": "DEMO",
