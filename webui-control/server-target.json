@@ -1,0 +1,13 @@
+{
+  "version": "0.1",
+  "repository_checkout": "/home/katie/t212-scanner-test",
+  "runtime_target": "/home/katie/t212-scanner",
+  "state_target": "/var/lib/t212-scanner",
+  "openwebui_container": "open-webui",
+  "openwebui_data_dir": "/app/backend/data",
+  "notes": [
+    "repository_checkout is the currently verified Git checkout used for source validation and preflight",
+    "runtime_target is the intended stable deployment location and must not be assumed to exist until deployment",
+    "state_target is runtime state only and must never contain source credentials"
+  ]
+}
