@@ -1,0 +1,53 @@
+{
+  "version": "0.1",
+  "policy": {
+    "audit_first": true,
+    "additive_only": true,
+    "preserve_unknown_model_fields": true,
+    "no_destructive_sync": true,
+    "no_secret_fields": true,
+    "publishing_enabled": false,
+    "scheduling_changes_enabled": false
+  },
+  "models": [
+    {
+      "id": "apps-plugins-bots--deepseek",
+      "required_skills": [
+        "open-webui-build-engineer",
+        "apps-integration-governance",
+        "qa-verification",
+        "autonomy-safety-guardrails"
+      ],
+      "managed_skill_sources": {
+        "apps-integration-governance": "webui-assets/skills/apps-integration-governance.md",
+        "autonomy-safety-guardrails": "webui-assets/skills/autonomy-safety-guardrails.md"
+      }
+    },
+    {
+      "id": "you-heal-content-production--deepseek",
+      "required_skills": [
+        "content-operations-director",
+        "you-heal-governance",
+        "qa-verification",
+        "autonomy-safety-guardrails"
+      ],
+      "managed_skill_sources": {
+        "you-heal-governance": "webui-assets/skills/you-heal-governance.md",
+        "autonomy-safety-guardrails": "webui-assets/skills/autonomy-safety-guardrails.md"
+      }
+    },
+    {
+      "id": "books-publishing--deepseek",
+      "required_skills": [
+        "content-operations-director",
+        "books-publishing-governance",
+        "qa-verification",
+        "autonomy-safety-guardrails"
+      ],
+      "managed_skill_sources": {
+        "books-publishing-governance": "webui-assets/skills/books-publishing-governance.md",
+        "autonomy-safety-guardrails": "webui-assets/skills/autonomy-safety-guardrails.md"
+      }
+    }
+  ]
+}
