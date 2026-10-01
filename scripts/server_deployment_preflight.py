@@ -60,6 +60,7 @@ def assess(
     min_disk_bytes: int,
     expected_branch: str,
     expected_commit: str | None,
+    expected_repo_path: str | None = None,
 ) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
 
@@ -68,6 +69,13 @@ def assess(
 
     branch = snapshot.get("git_branch")
     commit = snapshot.get("git_commit")
+    repo_path = snapshot.get("repo_path")
+    if expected_repo_path:
+        add(
+            "repository_checkout",
+            repo_path == expected_repo_path,
+            f"path={repo_path or 'unavailable'}",
+        )
     add("expected_branch", branch == expected_branch, f"branch={branch or 'unavailable'}")
     add("clean_worktree", snapshot.get("git_clean") is True, "clean" if snapshot.get("git_clean") else "dirty_or_unavailable")
     add("commit_available", bool(commit), f"commit={commit or 'unavailable'}")
@@ -116,6 +124,7 @@ def assess(
         "status": status,
         "branch": branch,
         "commit": commit,
+        "repository_checkout": repo_path,
         "checks": checks,
         "failed_checks": failed,
         "side_effects": "none",
@@ -166,6 +175,7 @@ def collect(repo_dir: Path, container: str, data_dir: str) -> dict[str, Any]:
         pass
 
     return {
+        "repo_path": str(repo_dir),
         "git_branch": branch,
         "git_commit": commit,
         "git_clean": status.returncode == 0 and not status.stdout.strip(),
@@ -179,11 +189,20 @@ def collect(repo_dir: Path, container: str, data_dir: str) -> dict[str, Any]:
     }
 
 
+def load_server_target(repo_dir: Path) -> dict[str, Any]:
+    path = repo_dir / "webui-control" / "server-target.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Unable to read server target config: {exc}") from exc
+    return payload
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a read-only WebUI deployment-readiness preflight.")
     parser.add_argument("--repo-dir", default=".", help="Checked-out repository directory.")
-    parser.add_argument("--container", default="open-webui", help="OpenWebUI Docker container name.")
-    parser.add_argument("--data-dir", default="/app/backend/data", help="OpenWebUI data directory in the container.")
+    parser.add_argument("--container", help="OpenWebUI Docker container name; defaults to server-target.json.")
+    parser.add_argument("--data-dir", help="OpenWebUI data directory; defaults to server-target.json.")
     parser.add_argument("--expected-branch", default=DEFAULT_BRANCH)
     parser.add_argument("--expected-commit", help="Approved 40-character Git commit SHA.")
     parser.add_argument("--max-backup-age-hours", type=float, default=24.0)
@@ -194,25 +213,33 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     repo_dir = Path(args.repo_dir).expanduser().resolve()
+    if not repo_dir.is_dir():
+        raise SystemExit("Repository directory does not exist.")
 
-    if not SAFE_NAME.fullmatch(args.container):
+    target = load_server_target(repo_dir)
+    expected_repo_path = str(target.get("repository_checkout") or "")
+    container = args.container or str(target.get("openwebui_container") or "")
+    data_dir = args.data_dir or str(target.get("openwebui_data_dir") or "")
+
+    if not SAFE_NAME.fullmatch(container):
         raise SystemExit("Invalid container name.")
-    if not SAFE_ABSOLUTE_PATH.fullmatch(args.data_dir) or ".." in Path(args.data_dir).parts:
+    if not SAFE_ABSOLUTE_PATH.fullmatch(data_dir) or ".." in Path(data_dir).parts:
         raise SystemExit("Invalid data directory.")
+    if not SAFE_ABSOLUTE_PATH.fullmatch(expected_repo_path) or ".." in Path(expected_repo_path).parts:
+        raise SystemExit("Invalid repository checkout path in server-target.json.")
     if args.expected_commit and not re.fullmatch(r"[0-9a-fA-F]{40}", args.expected_commit):
         raise SystemExit("Expected commit must be a 40-character hexadecimal SHA.")
     if args.max_backup_age_hours <= 0 or args.min_disk_gib <= 0:
         raise SystemExit("Backup age and minimum disk space must be positive.")
-    if not repo_dir.is_dir():
-        raise SystemExit("Repository directory does not exist.")
 
     report = assess(
-        collect(repo_dir, args.container, args.data_dir),
+        collect(repo_dir, container, data_dir),
         now_epoch=time.time(),
         max_backup_age_hours=args.max_backup_age_hours,
         min_disk_bytes=int(args.min_disk_gib * 1024**3),
         expected_branch=args.expected_branch,
         expected_commit=args.expected_commit.lower() if args.expected_commit else None,
+        expected_repo_path=expected_repo_path,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["status"] in {"READY", "READY_FOR_COMMIT_APPROVAL"} else 1
