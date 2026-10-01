@@ -1,41 +1,175 @@
 {
-  "version": "0.5",
+  "version": "0.6",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
   "source_branch": "feature/t212-instrument-cache-v03",
   "components": [
-    {"id":"workspace-registry","config":"webui-control/workspaces.json","code":null},
-    {"id":"workspace-runtime-contract","config":"webui-control/workspace-runtime-contract.json","code":"scripts/validate_workspace_runtime_contract.py"},
-    {"id":"agent-contract","config":"webui-control/agent-contract.json","code":null},
-    {"id":"model-router","config":"webui-control/model-router.json","code":"openwebui/tools/model_router.py"},
-    {"id":"plugin-registry","config":"webui-control/plugin-registry.json","code":"openwebui/tools/plugin_registry.py"},
-    {"id":"automation-ledger","config":"webui-control/automation-run-schema.json","code":"openwebui/tools/automation_ledger.py"},
-    {"id":"shift-handoff","config":"webui-control/shift-handoff-schema.json","code":"openwebui/tools/shift_handoff.py"},
-    {"id":"books-pipeline","config":"webui-control/books-pipeline.json","code":"openwebui/tools/workspace_pipeline.py"},
-    {"id":"you-heal-pipeline","config":"webui-control/you-heal-pipeline.json","code":"openwebui/tools/workspace_pipeline.py"},
-    {"id":"nontrading-model-bindings","config":"webui-control/nontrading-model-bindings.json","code":"scripts/plan_model_binding_patch.py"},
-    {"id":"dashboard-snapshot","config":"webui-control/dashboard-schema.json","code":"openwebui/tools/dashboard_snapshot.py"},
-    {"id":"credit-control","config":"webui-control/credit-policy.json","code":"openwebui/tools/credit_control.py"},
-    {"id":"server-target","config":"webui-control/server-target.json","code":null},
-    {"id":"t212-methodology","config":"webui-control/t212-methodology.json","code":null},
-    {"id":"t212-implementation-map","config":"webui-control/t212-implementation-map.json","code":"scripts/build_t212_gap_register.py"},
-    {"id":"t212-risk-controls","config":"webui-control/t212-risk-controls.json","code":"openwebui/tools/t212_risk_gate.py"},
-    {"id":"t212-failure-taxonomy","config":"webui-control/t212-failure-taxonomy.json","code":null},
-    {"id":"trade-proposal-contract","config":"webui-control/trade-proposal.schema.json","code":null},
-    {"id":"trading-state-machine","config":null,"code":"openwebui/tools/trading_state_machine.py"},
-    {"id":"discovery-adapter","config":null,"code":"worker/discovery_adapter.py"},
-    {"id":"discovery-worker","config":null,"code":"worker/run_discovery_cycle.py"},
-    {"id":"discovery-healthcheck","config":null,"code":"worker/healthcheck.py"},
-    {"id":"instrument-cache-worker","config":null,"code":"scripts/refresh_t212_cache_worker.py"},
-    {"id":"runtime-evidence-collector","config":null,"code":"scripts/collect_runtime_evidence.py"},
-    {"id":"implementation-register","config":null,"code":"scripts/build_implementation_register.py"},
-    {"id":"server-deployment-preflight","config":null,"code":"scripts/server_deployment_preflight.py"},
-    {"id":"morning-human-action-pack","config":"webui-control/morning-human-actions.json","code":"scripts/build_morning_handoff.py"},
-    {"id":"trading-v3-prepared-knowledge","config":"webui-assets/knowledge/TRADING_OPERATIONS_CANONICAL_V3_PREPARED.md","code":null},
-    {"id":"you-heal-governance-skill","config":"webui-assets/skills/you-heal-governance.md","code":null},
-    {"id":"books-governance-skill","config":"webui-assets/skills/books-publishing-governance.md","code":null},
-    {"id":"apps-governance-skill","config":"webui-assets/skills/apps-integration-governance.md","code":null}
+    {
+      "id": "workspace-registry",
+      "config": "webui-control/workspaces.json",
+      "code": null
+    },
+    {
+      "id": "workspace-runtime-contract",
+      "config": "webui-control/workspace-runtime-contract.json",
+      "code": "scripts/validate_workspace_runtime_contract.py"
+    },
+    {
+      "id": "agent-contract",
+      "config": "webui-control/agent-contract.json",
+      "code": null
+    },
+    {
+      "id": "model-router",
+      "config": "webui-control/model-router.json",
+      "code": "openwebui/tools/model_router.py"
+    },
+    {
+      "id": "plugin-registry",
+      "config": "webui-control/plugin-registry.json",
+      "code": "openwebui/tools/plugin_registry.py"
+    },
+    {
+      "id": "automation-ledger",
+      "config": "webui-control/automation-run-schema.json",
+      "code": "openwebui/tools/automation_ledger.py"
+    },
+    {
+      "id": "shift-handoff",
+      "config": "webui-control/shift-handoff-schema.json",
+      "code": "openwebui/tools/shift_handoff.py"
+    },
+    {
+      "id": "books-pipeline",
+      "config": "webui-control/books-pipeline.json",
+      "code": "openwebui/tools/workspace_pipeline.py"
+    },
+    {
+      "id": "you-heal-pipeline",
+      "config": "webui-control/you-heal-pipeline.json",
+      "code": "openwebui/tools/workspace_pipeline.py"
+    },
+    {
+      "id": "nontrading-model-bindings",
+      "config": "webui-control/nontrading-model-bindings.json",
+      "code": "scripts/plan_model_binding_patch.py"
+    },
+    {
+      "id": "dashboard-snapshot",
+      "config": "webui-control/dashboard-schema.json",
+      "code": "openwebui/tools/dashboard_snapshot.py"
+    },
+    {
+      "id": "credit-control",
+      "config": "webui-control/credit-policy.json",
+      "code": "openwebui/tools/credit_control.py"
+    },
+    {
+      "id": "server-target",
+      "config": "webui-control/server-target.json",
+      "code": null
+    },
+    {
+      "id": "t212-methodology",
+      "config": "webui-control/t212-methodology.json",
+      "code": null
+    },
+    {
+      "id": "t212-implementation-map",
+      "config": "webui-control/t212-implementation-map.json",
+      "code": "scripts/build_t212_gap_register.py"
+    },
+    {
+      "id": "t212-risk-controls",
+      "config": "webui-control/t212-risk-controls.json",
+      "code": "openwebui/tools/t212_risk_gate.py"
+    },
+    {
+      "id": "t212-failure-taxonomy",
+      "config": "webui-control/t212-failure-taxonomy.json",
+      "code": null
+    },
+    {
+      "id": "trade-proposal-contract",
+      "config": "webui-control/trade-proposal.schema.json",
+      "code": null
+    },
+    {
+      "id": "trading-state-machine",
+      "config": null,
+      "code": "openwebui/tools/trading_state_machine.py"
+    },
+    {
+      "id": "discovery-adapter",
+      "config": null,
+      "code": "worker/discovery_adapter.py"
+    },
+    {
+      "id": "discovery-worker",
+      "config": null,
+      "code": "worker/run_discovery_cycle.py"
+    },
+    {
+      "id": "discovery-healthcheck",
+      "config": null,
+      "code": "worker/healthcheck.py"
+    },
+    {
+      "id": "instrument-cache-worker",
+      "config": null,
+      "code": "scripts/refresh_t212_cache_worker.py"
+    },
+    {
+      "id": "runtime-evidence-collector",
+      "config": null,
+      "code": "scripts/collect_runtime_evidence.py"
+    },
+    {
+      "id": "implementation-register",
+      "config": null,
+      "code": "scripts/build_implementation_register.py"
+    },
+    {
+      "id": "server-deployment-preflight",
+      "config": null,
+      "code": "scripts/server_deployment_preflight.py"
+    },
+    {
+      "id": "morning-human-action-pack",
+      "config": "webui-control/morning-human-actions.json",
+      "code": "scripts/build_morning_handoff.py"
+    },
+    {
+      "id": "trading-v3-prepared-knowledge",
+      "config": "webui-assets/knowledge/TRADING_OPERATIONS_CANONICAL_V3_PREPARED.md",
+      "code": null
+    },
+    {
+      "id": "you-heal-governance-skill",
+      "config": "webui-assets/skills/you-heal-governance.md",
+      "code": null
+    },
+    {
+      "id": "books-governance-skill",
+      "config": "webui-assets/skills/books-publishing-governance.md",
+      "code": null
+    },
+    {
+      "id": "apps-governance-skill",
+      "config": "webui-assets/skills/apps-integration-governance.md",
+      "code": null
+    },
+    {
+      "id": "workspace-isolation-audit",
+      "config": "webui-control/plugin-registry.json",
+      "code": "scripts/audit_workspace_isolation.py"
+    },
+    {
+      "id": "demo-validation-status",
+      "config": "webui-control/t212-methodology.json",
+      "code": "scripts/build_demo_validation_status.py"
+    }
   ],
   "gates": {
     "tests_command": "python -m unittest discover -s tests",
@@ -49,7 +183,9 @@
     "require_backup_evidence_before_deploy": true,
     "require_human_approval_before_deploy": true,
     "forbid_secrets_in_repository": true,
-    "require_runtime_evidence_for_proven_status": true
+    "require_runtime_evidence_for_proven_status": true,
+    "workspace_isolation_command": "python scripts/audit_workspace_isolation.py",
+    "demo_validation_status_command": "python scripts/build_demo_validation_status.py --ledger /var/lib/t212-scanner/demo_validation.jsonl"
   },
   "trading_safety": {
     "environment": "DEMO",
