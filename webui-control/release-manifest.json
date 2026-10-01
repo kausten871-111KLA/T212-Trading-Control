@@ -44,6 +44,11 @@
       "id": "you-heal-pipeline",
       "config": "webui-control/you-heal-pipeline.json",
       "code": "openwebui/tools/workspace_pipeline.py"
+    },
+    {
+      "id": "dashboard-snapshot",
+      "config": "webui-control/dashboard-schema.json",
+      "code": "openwebui/tools/dashboard_snapshot.py"
     }
   ],
   "gates": {
