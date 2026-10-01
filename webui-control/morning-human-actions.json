@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "title": "MORNING HUMAN-ACTION PACK",
   "actions": [
     {
@@ -8,7 +8,8 @@
       "requirement": "REQUIRED",
       "condition": "Run before any deployment.",
       "device_window": "Laptop > existing Contabo SSH terminal",
-      "command_template": "cd /home/katie/t212-scanner && test -z \"$(git status --porcelain)\" && git fetch origin {commit} && git merge --ff-only {commit} && python3 scripts/server_deployment_preflight.py --repo-dir . --expected-commit {commit}",
+      "repository_checkout": "/home/katie/t212-scanner-test",
+      "command_template": "cd /home/katie/t212-scanner-test && test -z \"$(git status --porcelain)\" && git fetch origin {commit} && git merge --ff-only {commit} && python3 scripts/server_deployment_preflight.py --repo-dir . --expected-commit {commit}",
       "success": "JSON ends with status READY, failed_checks is empty, side_effects is none.",
       "failure": "Stop. Do not reset, force checkout, delete files, restart containers or enable timers.",
       "never_paste": [
