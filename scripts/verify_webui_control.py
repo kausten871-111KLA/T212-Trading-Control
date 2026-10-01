@@ -23,6 +23,8 @@ CONFIG_FILES = [
     "webui-control/plugin-registry.json",
     "webui-control/automation-run-schema.json",
     "webui-control/shift-handoff-schema.json",
+    "webui-control/books-pipeline.json",
+    "webui-control/you-heal-pipeline.json",
     "webui-control/release-manifest.json",
 ]
 
