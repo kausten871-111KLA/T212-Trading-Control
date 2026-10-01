@@ -1,0 +1,66 @@
+{
+  "version": "0.1",
+  "title": "MORNING HUMAN-ACTION PACK",
+  "actions": [
+    {
+      "id": "server_sync_and_readiness",
+      "priority": 1,
+      "requirement": "REQUIRED",
+      "condition": "Run before any deployment.",
+      "device_window": "Laptop > existing Contabo SSH terminal",
+      "command_template": "cd /home/katie/t212-scanner && test -z \"$(git status --porcelain)\" && git fetch origin {commit} && git merge --ff-only {commit} && python3 scripts/server_deployment_preflight.py --repo-dir . --expected-commit {commit}",
+      "success": "JSON ends with status READY, failed_checks is empty, side_effects is none.",
+      "failure": "Stop. Do not reset, force checkout, delete files, restart containers or enable timers.",
+      "never_paste": [
+        "SSH private keys",
+        "server passwords",
+        "Trading 212 API key or secret",
+        "OpenWebUI admin key",
+        "Cloudflare tokens, cookies or one-time codes"
+      ],
+      "automatic_resume": "Authenticated deployment inspection, backup verification and reversible OpenWebUI staging can resume."
+    },
+    {
+      "id": "deployment_approval",
+      "priority": 2,
+      "requirement": "REQUIRED",
+      "condition": "Only after action 1 returns READY.",
+      "device_window": "This ChatGPT conversation",
+      "command_template": "APPROVE WEBUI CONTROL DEPLOYMENT {commit} — DEMO ONLY",
+      "success": "The approval names the exact tested commit and DEMO-only boundary.",
+      "failure": "Do not approve if the SHA differs or any readiness check failed.",
+      "never_paste": [
+        "credentials",
+        "API keys or secrets",
+        "SSH material",
+        "session cookies"
+      ],
+      "automatic_resume": "Exact-commit deployment, smoke tests and rollback verification can resume; order execution remains separately gated."
+    },
+    {
+      "id": "openwebui_access_recovery",
+      "priority": 3,
+      "requirement": "OPTIONAL",
+      "condition": "Only if live OpenWebUI access is still unavailable after approval.",
+      "device_window": "Laptop browser > existing OpenWebUI/Cloudflare Access page",
+      "click_path": "Open the existing OpenWebUI bookmark > complete Cloudflare Access sign-in > leave the authenticated tab open.",
+      "success": "The normal OpenWebUI workspace page loads; no secret appears in chat.",
+      "failure": "Stop at any unexpected certificate, domain or account prompt.",
+      "never_paste": [
+        "one-time codes",
+        "passwords",
+        "session cookies",
+        "OpenWebUI admin key"
+      ],
+      "automatic_resume": "Workspace/model visibility and post-deployment smoke tests can resume."
+    }
+  ],
+  "global_boundaries": {
+    "t212_environment": "DEMO",
+    "live_trading_enabled": false,
+    "order_mutation_enabled": false,
+    "publishing_enabled": false,
+    "scheduling_enabled": false,
+    "automatic_spending_enabled": false
+  }
+}
