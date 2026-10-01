@@ -1,8 +1,10 @@
 [Unit]
-Description=Run T212 deterministic discovery every 5 minutes
+Description=Run T212 deterministic discovery during approved UK-time session
 
 [Timer]
-OnCalendar=*:0/5
+OnCalendar=Mon..Fri *-*-* 14:20/5:00 Europe/London
+OnCalendar=Mon..Fri *-*-* 15..20:00/5:00 Europe/London
+OnCalendar=Mon..Fri *-*-* 21:00..05/5:00 Europe/London
 Persistent=true
 AccuracySec=20s
 Unit=t212-discovery.service
