@@ -1,0 +1,66 @@
+{
+  "version": "0.1",
+  "principle": "Logical workspace roles are not separate runtime agents unless an explicit model/skill/tool binding exists.",
+  "workspaces": {
+    "t212-demo": {
+      "model_id": "trading-operations--deepseek",
+      "logical_roles": {
+        "market-discovery": {
+          "skills": ["market-intelligence"],
+          "tools": ["market_data_gateway"],
+          "code": ["worker/discovery_adapter.py", "worker/run_discovery_cycle.py"]
+        },
+        "catalyst-verifier": {
+          "skills": ["market-intelligence", "trading-cito-orchestrator"],
+          "tools": ["market_data_gateway"],
+          "code": ["openwebui/tools/catalyst_handoff_queue.py"]
+        },
+        "risk-gate": {
+          "skills": ["trading-decision-engine", "shared-portfolio-ledger"],
+          "tools": ["trading_212_demo_gateway_tool"],
+          "code": ["openwebui/tools/t212_risk_gate.py", "openwebui/tools/trading_state_machine.py"]
+        },
+        "demo-execution-verifier": {
+          "skills": ["execution-position-control", "shared-portfolio-ledger"],
+          "tools": ["trading_212_demo_gateway_tool"],
+          "code": ["openwebui/tools/trading_state_machine.py"]
+        },
+        "missed-op-auditor": {
+          "skills": ["learning-qa", "trading-operations-dashboard"],
+          "tools": ["market_data_gateway", "trading_212_demo_gateway_tool"],
+          "code": ["worker/run_eod_audit.py", "openwebui/tools/missed_green_audit.py"]
+        }
+      }
+    },
+    "apps-plugins-bots": {
+      "model_id": "apps-plugins-bots--deepseek",
+      "logical_roles": {
+        "webui-engineer": {"skills":["open-webui-build-engineer","apps-integration-governance"],"tools":[]},
+        "plugin-manager": {"skills":["apps-integration-governance"],"tools":[]},
+        "integration-tester": {"skills":["qa-verification","apps-integration-governance"],"tools":[]},
+        "release-manager": {"skills":["open-webui-build-engineer","qa-verification","autonomy-safety-guardrails"],"tools":[]}
+      }
+    },
+    "you-heal-content": {
+      "model_id": "you-heal-content-production--deepseek",
+      "logical_roles": {
+        "content-director": {"skills":["content-operations-director","you-heal-governance"],"tools":[]},
+        "script-editor": {"skills":["you-heal-governance"],"tools":[]},
+        "science-claims-reviewer": {"skills":["you-heal-governance","qa-verification"],"tools":[]},
+        "film-director": {"skills":["content-operations-director","you-heal-governance"],"tools":[]},
+        "distribution-agent": {"skills":["you-heal-governance","autonomy-safety-guardrails"],"tools":[]},
+        "analytics-agent": {"skills":["qa-verification","you-heal-governance"],"tools":[]}
+      }
+    },
+    "books-publishing": {
+      "model_id": "books-publishing--deepseek",
+      "logical_roles": {
+        "book-editor": {"skills":["content-operations-director","books-publishing-governance"],"tools":[]},
+        "research-agent": {"skills":["books-publishing-governance","qa-verification"],"tools":[]},
+        "continuity-editor": {"skills":["books-publishing-governance","qa-verification"],"tools":[]},
+        "fact-checker": {"skills":["books-publishing-governance","qa-verification"],"tools":[]},
+        "publishing-agent": {"skills":["books-publishing-governance","autonomy-safety-guardrails"],"tools":[]}
+      }
+    }
+  }
+}
