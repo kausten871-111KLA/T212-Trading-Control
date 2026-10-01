@@ -38,19 +38,24 @@ class MissedGreenAudit:
             traded_row = traded_map.get(key)
 
             if not surfaced_row:
-                code = "SCANNER_DETECTION_FAILURE"
+                code = "NEV"
+                root_code = "SCANNER_DETECTION_FAILURE"
                 reason = "material mover was never surfaced"
             elif traded_row:
                 code = "TRADED"
+                root_code = "TRADED"
                 reason = "broker-confirmed trade exists"
             elif surfaced_row.get("scanner_state") == "rejected":
-                code = "RULE_THRESHOLD_FALSE_NEGATIVE"
+                code = "RET"
+                root_code = "RULE_THRESHOLD_FALSE_NEGATIVE"
                 reason = "surfaced but rejected by deterministic qualification gate"
             elif surfaced_row.get("catalyst_state") in ("unknown", "unverified", "none"):
-                code = "UNKNOWN_CAUSE"
+                code = "AVOIDED"
+                root_code = "UNKNOWN_CAUSE"
                 reason = "surfaced without sufficiently verified causal evidence"
             else:
-                code = "EXECUTION_INTEGRATION_FAILURE"
+                code = "NOTRADED"
+                root_code = "EXECUTION_INTEGRATION_FAILURE"
                 reason = "qualified candidate had no broker-confirmed trade and no more specific recorded cause"
 
             rows.append({
@@ -58,6 +63,7 @@ class MissedGreenAudit:
                 "t212_ticker": mover.get("t212_ticker"),
                 "change_pct": mover.get("change_pct") or mover.get("changePctVsPrevClose"),
                 "audit_code": code,
+                "root_cause_code": root_code,
                 "audit_reason": reason,
                 "scanner_state": (surfaced_row or {}).get("scanner_state"),
                 "gate_failures": (surfaced_row or {}).get("gate_failures"),
