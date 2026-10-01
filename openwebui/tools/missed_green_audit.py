@@ -2,7 +2,7 @@
 title: Missed Green Audit Core
 author: Katie / OpenAI
 description: Deterministic EOD audit comparing actual movers, scanner surfacing, and broker fills. No order placement.
-version: 0.1.0
+version: 0.2.0
 """
 
 from typing import Any, Dict, Iterable, List
@@ -38,20 +38,20 @@ class MissedGreenAudit:
             traded_row = traded_map.get(key)
 
             if not surfaced_row:
-                code = "NEV"
-                reason = "never surfaced"
+                code = "SCANNER_DETECTION_FAILURE"
+                reason = "material mover was never surfaced"
             elif traded_row:
                 code = "TRADED"
                 reason = "broker-confirmed trade exists"
             elif surfaced_row.get("scanner_state") == "rejected":
-                code = "RET"
-                reason = "surfaced but rejected by deterministic gate"
+                code = "RULE_THRESHOLD_FALSE_NEGATIVE"
+                reason = "surfaced but rejected by deterministic qualification gate"
             elif surfaced_row.get("catalyst_state") in ("unknown", "unverified", "none"):
-                code = "AVOIDED"
-                reason = "surfaced but no verified catalyst"
+                code = "UNKNOWN_CAUSE"
+                reason = "surfaced without sufficiently verified causal evidence"
             else:
-                code = "NOTRADED"
-                reason = "surfaced and qualified but not traded"
+                code = "EXECUTION_INTEGRATION_FAILURE"
+                reason = "qualified candidate had no broker-confirmed trade and no more specific recorded cause"
 
             rows.append({
                 "symbol": mover.get("symbol") or mover.get("ticker"),
@@ -70,7 +70,7 @@ class MissedGreenAudit:
             counts[row["audit_code"]] = counts.get(row["audit_code"], 0) + 1
 
         return {
-            "auditVersion": "0.1.0",
+            "auditVersion": "0.2.0",
             "topN": self.top_n,
             "counts": counts,
             "rows": rows,
