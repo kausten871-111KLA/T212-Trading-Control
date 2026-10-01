@@ -35,6 +35,13 @@ def validate_pipeline_config(config: Mapping[str, Any]) -> None:
             raise PipelineValidationError(f"{action} must remain disabled")
     if config["workspace"] == "you-heal-content" and actions.get("spend_enabled") is not False:
         raise PipelineValidationError("You Heal spend must remain disabled")
+    transition_policy = config.get("transition_policy", {})
+    if transition_policy.get("sequential_only") is not True:
+        raise PipelineValidationError("pipeline transitions must be sequential")
+    if transition_policy.get("skip_forward_states_allowed") is not False:
+        raise PipelineValidationError("forward state skipping must remain disabled")
+    if transition_policy.get("published_state_disabled_in_control_plane") is not True:
+        raise PipelineValidationError("published state must remain disabled in control plane")
 
 
 def validate_item(config: Mapping[str, Any], item: Mapping[str, Any]) -> None:
@@ -102,6 +109,11 @@ def transition_item(
     destination_index = config["states"].index(destination)
     if destination_index < current_index:
         raise PipelineValidationError("backward movement requires an explicit revision workflow")
+    if destination_index != current_index + 1:
+        raise PipelineValidationError("normal pipeline transitions must advance exactly one state")
+    if destination in {"READY_FOR_APPROVAL", "APPROVED", "PUBLISHED"}:
+        if item["rights_status"] != "VERIFIED":
+            raise PermissionError("transition requires verified rights status")
     gates = missing_gates(config, item, destination, approval_actions)
     if gates:
         raise PermissionError("transition blocked by " + ", ".join(gates))
