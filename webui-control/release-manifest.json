@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
@@ -54,6 +54,11 @@
       "id": "credit-control",
       "config": "webui-control/credit-policy.json",
       "code": "openwebui/tools/credit_control.py"
+    },
+    {
+      "id": "server-target",
+      "config": "webui-control/server-target.json",
+      "code": null
     },
     {
       "id": "server-deployment-preflight",
