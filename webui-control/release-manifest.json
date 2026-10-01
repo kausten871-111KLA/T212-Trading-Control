@@ -1,5 +1,5 @@
 {
-  "version": "0.3",
+  "version": "0.4",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
@@ -17,8 +17,13 @@
     {"id":"credit-control","config":"webui-control/credit-policy.json","code":"openwebui/tools/credit_control.py"},
     {"id":"server-target","config":"webui-control/server-target.json","code":null},
     {"id":"t212-methodology","config":"webui-control/t212-methodology.json","code":null},
+    {"id":"t212-risk-controls","config":"webui-control/t212-risk-controls.json","code":"openwebui/tools/t212_risk_gate.py"},
+    {"id":"t212-failure-taxonomy","config":"webui-control/t212-failure-taxonomy.json","code":null},
+    {"id":"trade-proposal-contract","config":"webui-control/trade-proposal.schema.json","code":null},
+    {"id":"trading-state-machine","config":null,"code":"openwebui/tools/trading_state_machine.py"},
     {"id":"discovery-adapter","config":null,"code":"worker/discovery_adapter.py"},
     {"id":"discovery-worker","config":null,"code":"worker/run_discovery_cycle.py"},
+    {"id":"runtime-evidence-collector","config":null,"code":"scripts/collect_runtime_evidence.py"},
     {"id":"implementation-register","config":null,"code":"scripts/build_implementation_register.py"},
     {"id":"server-deployment-preflight","config":null,"code":"scripts/server_deployment_preflight.py"},
     {"id":"morning-human-action-pack","config":"webui-control/morning-human-actions.json","code":"scripts/build_morning_handoff.py"}
@@ -26,7 +31,8 @@
   "gates": {
     "tests_command": "python -m unittest discover -s tests",
     "preflight_command": "python scripts/verify_webui_control.py",
-    "implementation_register_command": "python scripts/build_implementation_register.py",
+    "runtime_evidence_command": "python scripts/collect_runtime_evidence.py --output /var/lib/t212-scanner/runtime_evidence.json",
+    "implementation_register_command": "python scripts/build_implementation_register.py --evidence /var/lib/t212-scanner/runtime_evidence.json",
     "require_clean_test_exit": true,
     "require_exact_commit_checkout": true,
     "require_backup_evidence_before_deploy": true,
