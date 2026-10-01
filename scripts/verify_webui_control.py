@@ -31,6 +31,7 @@ CONFIG_FILES = [
     "webui-control/credit-policy.json",
     "webui-control/morning-human-actions.json",
     "webui-control/server-target.json",
+    "webui-control/t212-methodology.json",
     "webui-control/release-manifest.json",
 ]
 
@@ -59,6 +60,38 @@ def validate_server_target(config: dict) -> None:
         raise ValueError("server target must distinguish source checkout from runtime target")
 
 
+def validate_t212_methodology(config: dict) -> None:
+    safety = config.get("safety") or {}
+    if safety.get("environment") != "DEMO":
+        raise ValueError("T212 methodology must remain DEMO")
+    if safety.get("live_trading") is not False:
+        raise ValueError("T212 methodology must keep live trading disabled")
+    if safety.get("order_mutation_during_control_validation") is not False:
+        raise ValueError("T212 methodology must deny order mutation during control validation")
+    if safety.get("fail_closed_on_stale_or_missing_data") is not True:
+        raise ValueError("T212 methodology must fail closed on stale or missing data")
+
+    required_lifecycle = [
+        "DISCOVERY",
+        "QUALIFICATION",
+        "CATALYST_VERIFIED",
+        "RISK_GATED",
+        "PROPOSAL",
+        "HUMAN_APPROVAL",
+        "DEMO_EXECUTION",
+        "BROKER_VERIFICATION",
+        "MONITORING",
+        "EXIT",
+        "REVIEW",
+    ]
+    if config.get("lifecycle") != required_lifecycle:
+        raise ValueError("T212 lifecycle is incomplete or out of sequence")
+
+    evidence = config.get("evidence_rules") or {}
+    if evidence.get("no_operational_success_from_prompt_or_config_alone") is not True:
+        raise ValueError("T212 evidence rules must reject prompt-only success claims")
+
+
 def main() -> int:
     report = {
         "status": "PASS",
@@ -73,6 +106,7 @@ def main() -> int:
             "order_mutation": False,
         },
         "server_target": {},
+        "methodology_version": None,
     }
 
     configs: dict[str, dict] = {}
@@ -91,12 +125,14 @@ def main() -> int:
             validate_pipeline_config(configs["webui-control/you-heal-pipeline.json"])
             validate_policy(configs["webui-control/credit-policy.json"])
             validate_server_target(configs["webui-control/server-target.json"])
+            validate_t212_methodology(configs["webui-control/t212-methodology.json"])
             target = configs["webui-control/server-target.json"]
             report["server_target"] = {
                 "repository_checkout": target["repository_checkout"],
                 "runtime_target": target["runtime_target"],
                 "state_target": target["state_target"],
             }
+            report["methodology_version"] = configs["webui-control/t212-methodology.json"].get("version")
         except ValueError as exc:
             report["failures"].append(f"control config: {exc}")
 
