@@ -88,8 +88,8 @@ class ScannerCoreTests(unittest.TestCase):
             traded=[],
         )
         by_symbol = {r['symbol']: r['audit_code'] for r in result['rows']}
-        self.assertEqual(by_symbol['AAA'], 'NEV')
-        self.assertEqual(by_symbol['BBB'], 'RET')
+        self.assertEqual(by_symbol['AAA'], 'SCANNER_DETECTION_FAILURE')
+        self.assertEqual(by_symbol['BBB'], 'RULE_THRESHOLD_FALSE_NEGATIVE')
 
     def test_t212_cache_first_snapshot_is_baseline(self):
         with tempfile.TemporaryDirectory() as td:
