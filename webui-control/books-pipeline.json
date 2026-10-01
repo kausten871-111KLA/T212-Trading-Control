@@ -1,0 +1,85 @@
+{
+  "version": "0.1",
+  "workspace": "books-publishing",
+  "purpose": "Track manuscripts and publishing assets without drafting or publishing inside the control plane.",
+  "states": [
+    "INTAKE",
+    "CHAPTER_MAP",
+    "DRAFT",
+    "RESEARCH",
+    "REWRITE",
+    "CONTINUITY_REVIEW",
+    "FACT_QA",
+    "STYLE_REVIEW",
+    "REFERENCES",
+    "LAYOUT",
+    "READY_FOR_APPROVAL",
+    "APPROVED",
+    "PUBLISHED"
+  ],
+  "source_policy": {
+    "source_files_immutable": true,
+    "edits_create_new_version": true,
+    "delete_source_allowed": false,
+    "overwrite_source_allowed": false,
+    "cross_workspace_visibility": false,
+    "public_share_allowed": false
+  },
+  "required_state_fields": [
+    "item_id",
+    "title",
+    "state",
+    "version",
+    "source_refs",
+    "owner",
+    "updated_at",
+    "rights_status",
+    "privacy",
+    "approvals",
+    "checks"
+  ],
+  "checks": {
+    "CONTINUITY_REVIEW": [
+      "continuity_complete",
+      "duplication_checked"
+    ],
+    "FACT_QA": [
+      "fact_check_complete",
+      "open_questions_recorded"
+    ],
+    "REFERENCES": [
+      "sources_linked",
+      "citation_gaps_recorded"
+    ],
+    "READY_FOR_APPROVAL": [
+      "continuity_complete",
+      "fact_check_complete",
+      "sources_linked",
+      "rights_verified"
+    ]
+  },
+  "approvals": {
+    "APPROVED": [
+      "human_content_approval"
+    ],
+    "PUBLISHED": [
+      "human_content_approval",
+      "human_publish_approval"
+    ]
+  },
+  "actions": {
+    "draft_content_enabled": false,
+    "publish_enabled": false,
+    "schedule_enabled": false,
+    "external_share_enabled": false
+  },
+  "handoff_fields": [
+    "current_state",
+    "completed_checks",
+    "open_questions",
+    "blockers",
+    "next_action",
+    "source_refs",
+    "latest_version_ref"
+  ]
+}
