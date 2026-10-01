@@ -30,6 +30,7 @@ from worker.discovery_adapter import (
     load_snapshot,
     normalize_rows,
 )
+from worker.session_gate import RunGuardError, RunSlotGuard, evaluate_session
 
 
 STATE = Path(os.getenv("T212_SCANNER_STATE_DIR", "/var/lib/t212-scanner"))
@@ -42,6 +43,8 @@ SURFACED_OUT = Path(os.getenv("T212_SURFACED_OUTPUT", str(STATE / "surfaced_cand
 AUTOMATION_LEDGER = Path(os.getenv("T212_AUTOMATION_LEDGER", str(STATE / "automation_runs.jsonl")))
 SNAPSHOT_MAX_AGE_SECONDS = int(os.getenv("T212_MARKET_MAX_AGE_SECONDS", "300"))
 CACHE_TTL_SECONDS = int(os.getenv("T212_INSTRUMENT_CACHE_TTL_SECONDS", "86400"))
+RUN_LOCK_PATH = Path(os.getenv("T212_DISCOVERY_RUN_LOCK", str(STATE / "discovery_run.lock")))
+RUN_SLOT_STATE_PATH = Path(os.getenv("T212_DISCOVERY_SLOT_STATE", str(STATE / "discovery_slot_state.json")))
 
 
 def atomic_json(path: Path, payload: dict) -> None:
@@ -152,7 +155,42 @@ def run_cycle() -> dict:
     return output
 
 
+def _record_skip(decision: dict, reason: str) -> int:
+    observed = datetime.now(timezone.utc).isoformat()
+    status = {
+        "started_at": observed,
+        "finished_at": observed,
+        "mode": "DEMO",
+        "ok": True,
+        "skipped": True,
+        "skip_reason": reason,
+        "session_gate": decision,
+        "live_trading_enabled": False,
+        "orders_submitted": 0,
+    }
+    atomic_json(STATUS_PATH, status)
+    log("discovery_skipped", status)
+    print(json.dumps(status, sort_keys=True))
+    return 0
+
+
 def main() -> int:
+    now = datetime.now(timezone.utc)
+    decision = evaluate_session(now)
+    decision_payload = decision.to_dict()
+
+    # This gate executes before snapshots, caches, scanners, models or providers.
+    if not decision.allowed:
+        return _record_skip(decision_payload, decision.reason)
+
+    guard = RunSlotGuard(lock_path=RUN_LOCK_PATH, state_path=RUN_SLOT_STATE_PATH)
+    try:
+        guard.acquire()
+        attempt = guard.start(decision.slot_key or "", now)
+    except RunGuardError as exc:
+        guard.release()
+        return _record_skip(decision_payload, str(exc))
+
     started = datetime.now(timezone.utc)
     run_id = f"discovery-{started.strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
     status = {
@@ -160,6 +198,8 @@ def main() -> int:
         "started_at": started.isoformat(),
         "mode": "DEMO",
         "ok": False,
+        "attempt": attempt,
+        "session_gate": decision_payload,
         "live_trading_enabled": False,
         "orders_submitted": 0,
     }
@@ -180,6 +220,7 @@ def main() -> int:
                 "catalyst_queued_count": output["catalyst_queued_count"],
             }
         )
+        guard.complete()
         atomic_json(STATUS_PATH, status)
         log("discovery_succeeded", status)
         append_run(
@@ -190,6 +231,7 @@ def main() -> int:
                 status="SUCCEEDED",
                 ended_at=ended,
                 evidence=[
+                    f"session_slot={decision.slot_key}",
                     f"source_age_seconds={output['source_age_seconds']}",
                     f"instrument_cache_age_seconds={output['instrument_cache_age_seconds']}",
                     f"evaluated_count={output['evaluated_count']}",
@@ -204,6 +246,7 @@ def main() -> int:
         return 0
 
     except DiscoveryInputError as exc:
+        guard.fail()
         ended = datetime.now(timezone.utc).isoformat()
         message = str(exc)
         status.update(
@@ -222,7 +265,7 @@ def main() -> int:
                 started_at=started.isoformat(),
                 status="BLOCKED",
                 ended_at=ended,
-                evidence=[message, "orders_submitted=0"],
+                evidence=[f"session_slot={decision.slot_key}", message, "orders_submitted=0"],
                 output_refs=[STATUS_PATH.name],
                 next_action="restore fresh market snapshot and DEMO instrument cache",
                 error=message,
@@ -232,6 +275,7 @@ def main() -> int:
         return 2
 
     except Exception as exc:
+        guard.fail()
         ended = datetime.now(timezone.utc).isoformat()
         message = f"{type(exc).__name__}: {exc}"
         status.update(
@@ -256,7 +300,7 @@ def main() -> int:
                     started_at=started.isoformat(),
                     status="FAILED",
                     ended_at=ended,
-                    evidence=["orders_submitted=0"],
+                    evidence=[f"session_slot={decision.slot_key}", "orders_submitted=0"],
                     output_refs=[STATUS_PATH.name],
                     next_action="inspect worker error and rerun after fix",
                     error=message,
@@ -266,6 +310,8 @@ def main() -> int:
             pass
         print(json.dumps(status, sort_keys=True))
         return 1
+    finally:
+        guard.release()
 
 
 if __name__ == "__main__":
