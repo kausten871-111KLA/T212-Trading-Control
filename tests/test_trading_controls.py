@@ -13,8 +13,8 @@ class TradingControlTests(unittest.TestCase):
             "entry_range": {"low": 9.9, "high": 10.1},
             "profit_targets": [10.8],
             "risk_stop": 9.8,
-            "quantity": 10,
-            "intended_exposure": 100,
+            "quantity": 5,
+            "intended_exposure": 50,
             "spread": {"pct_midpoint": 1.0},
             "safety": {
                 "environment": "DEMO",
