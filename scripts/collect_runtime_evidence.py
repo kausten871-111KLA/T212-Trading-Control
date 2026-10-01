@@ -57,9 +57,11 @@ import json, sqlite3
 db_path = DATA_DIR + "/webui.db"
 db = sqlite3.connect("file:" + db_path + "?mode=ro", uri=True)
 db.row_factory = sqlite3.Row
-out = {"tools": [], "models": []}
-for row in db.execute("SELECT id,name,meta FROM tool ORDER BY name"):
+out = {"tools": [], "models": [], "skills": []}
+for row in db.execute("SELECT id,name FROM tool ORDER BY name"):
     out["tools"].append({"id": row["id"], "name": row["name"]})
+for row in db.execute("SELECT id,name,is_active FROM skill ORDER BY name"):
+    out["skills"].append({"id": row["id"], "name": row["name"], "is_active": bool(row["is_active"])})
 for row in db.execute("SELECT id,name,meta FROM model ORDER BY name"):
     meta = {}
     try:
@@ -82,17 +84,11 @@ db.close()
 '''.replace("DATA_DIR", repr(data_dir))
     result = run(["docker", "exec", container, "python3", "-c", py])
     if result.returncode != 0:
-        return {
-            "ok": False,
-            "error": "OpenWebUI metadata query failed",
-        }
+        return {"ok": False, "error": "OpenWebUI metadata query failed"}
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError:
-        return {
-            "ok": False,
-            "error": "OpenWebUI metadata query returned invalid JSON",
-        }
+        return {"ok": False, "error": "OpenWebUI metadata query returned invalid JSON"}
     payload["ok"] = True
     return payload
 
@@ -110,8 +106,28 @@ def component(id_: str, *, deployed=False, running=False, callable_=False, evide
     }
 
 
+def binding_evidence(model_rows: dict[str, dict[str, Any]], bindings: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = []
+    for spec in bindings.get("models", []):
+        model_id = str(spec.get("id") or "")
+        model = model_rows.get(model_id)
+        required = {str(item) for item in (spec.get("required_skills") or [])}
+        actual = {str(item) for item in ((model or {}).get("skillIds") or [])}
+        missing = sorted(required - actual)
+        rows.append({
+            "model_id": model_id,
+            "present": model is not None,
+            "required_skill_ids": sorted(required),
+            "actual_skill_ids": sorted(actual),
+            "missing_skill_ids": missing,
+            "complete": model is not None and not missing,
+        })
+    return rows
+
+
 def collect() -> dict[str, Any]:
     target = load_json(ROOT / "webui-control" / "server-target.json", {})
+    bindings = load_json(ROOT / "webui-control" / "nontrading-model-bindings.json", {})
     container = str(target.get("openwebui_container") or "open-webui")
     data_dir = str(target.get("openwebui_data_dir") or "/app/backend/data")
     state_dir = Path(str(target.get("state_target") or "/var/lib/t212-scanner"))
@@ -123,6 +139,11 @@ def collect() -> dict[str, Any]:
 
     webui = query_openwebui(container, data_dir) if container_running else {"ok": False, "error": "container not running"}
     tool_ids = {row.get("id") for row in webui.get("tools", []) if isinstance(row, dict)}
+    active_skill_ids = {
+        row.get("id")
+        for row in webui.get("skills", [])
+        if isinstance(row, dict) and row.get("id") and row.get("is_active") is True
+    }
     model_rows = {
         row.get("id"): row
         for row in webui.get("models", [])
@@ -137,6 +158,7 @@ def collect() -> dict[str, Any]:
         for item in trading.get("knowledge") or []
         if isinstance(item, dict) and item.get("name")
     }
+    binding_rows = binding_evidence(model_rows, bindings)
 
     required_models = {
         "trading-operations--deepseek",
@@ -150,7 +172,6 @@ def collect() -> dict[str, Any]:
         "market_data_gateway",
         "open_webui_site_configurator",
     }
-
     model_coverage = sorted(required_models & set(model_rows))
     tool_coverage = sorted(required_tools & tool_ids)
 
@@ -162,6 +183,7 @@ def collect() -> dict[str, Any]:
     status_file = file_summary(state_dir / "status.json")
     scan_file = file_summary(state_dir / "scanner_latest.json")
     cache_file = file_summary(state_dir / "t212_instrument_cache.json")
+    cache_status_file = file_summary(state_dir / "t212_instrument_cache_status.json")
     automation_file = file_summary(state_dir / "automation_runs.jsonl")
 
     webui_evidence = [
@@ -175,27 +197,21 @@ def collect() -> dict[str, Any]:
             "workspace-registry",
             deployed=required_models.issubset(set(model_rows)),
             running=container_running,
-            callable_=False,
             evidence=webui_evidence,
-            next_action="prove each project model can respond and surface its configured tools/knowledge",
+            next_action="prove each project model can respond and surface configured tools/skills/knowledge",
         ),
         component(
             "t212-methodology",
             deployed="Trading Operations Canonical v2" in knowledge_names,
             running=container_running,
-            callable_=False,
             evidence=[f"knowledge={sorted(knowledge_names)}"],
-            next_action="attach/verify the latest durable methodology contract without removing canonical v2",
+            next_action="retain canonical v2 and reconcile/attach the prepared current methodology without deleting existing knowledge",
         ),
         component(
             "discovery-adapter",
-            deployed=(state_dir / "scanner_latest.json").exists() or discovery_service["active"] in {"active", "activating"},
+            deployed=scan_file["present"] or discovery_service["active"] in {"active", "activating"},
             running=discovery_service["active"] in {"active", "activating"},
-            callable_=False,
-            evidence=[
-                f"service_active={discovery_service['active']}",
-                f"scan_present={scan_file['present']}",
-            ],
+            evidence=[f"service_active={discovery_service['active']}", f"scan={scan_file}", f"cache_status={cache_status_file}"],
             blocker=None if scan_file["present"] else "no scanner runtime artifact found",
             next_action="run one manual read-only discovery cycle with fresh market/cache inputs",
         ),
@@ -203,51 +219,63 @@ def collect() -> dict[str, Any]:
             "discovery-worker",
             deployed=discovery_service["active"] not in {"unknown", "not-found"} or discovery_timer["enabled"] not in {"unknown", "not-found"},
             running=discovery_timer["active"] == "active",
-            callable_=False,
-            evidence=[
-                f"service={discovery_service}",
-                f"timer={discovery_timer}",
-                f"status={status_file}",
-            ],
+            evidence=[f"service={discovery_service}", f"timer={discovery_timer}", f"status={status_file}"],
             next_action="validate worker manually before any timer enablement",
         ),
         component(
             "automation-ledger",
             deployed=automation_file["present"],
             running=automation_file["present"] and automation_file.get("size_bytes", 0) > 0,
-            callable_=False,
             evidence=[f"automation_ledger={automation_file}"],
             next_action="produce a verified discovery run and confirm ledger append",
         ),
         component(
+            "nontrading-model-bindings",
+            deployed=bool(binding_rows) and all(row["complete"] for row in binding_rows),
+            running=container_running,
+            evidence=[
+                f"{row['model_id']}:missing={row['missing_skill_ids']}"
+                for row in binding_rows
+            ],
+            blocker=None if binding_rows and all(row["complete"] for row in binding_rows) else "one or more non-trading model skill bindings are incomplete",
+            next_action="use Configurator audit/export then apply additive preserve-all-fields binding patch",
+        ),
+        component(
+            "managed-skills",
+            deployed=all(
+                skill in active_skill_ids
+                for skill in {
+                    "trading-cito-orchestrator",
+                    "market-intelligence",
+                    "trading-decision-engine",
+                    "execution-position-control",
+                    "learning-qa",
+                    "shared-portfolio-ledger",
+                    "trading-operations-dashboard",
+                    "autonomy-safety-guardrails",
+                }
+            ),
+            running=container_running,
+            evidence=[f"active_skill_count={len(active_skill_ids)}"],
+            next_action="install/update only managed GitHub skill assets that differ from audited runtime",
+        ),
+        component(
             "model-router",
-            deployed=False,
-            running=False,
-            callable_=False,
             evidence=["no runtime registration evidence collected for model-router"],
             next_action="register through bounded OpenWebUI integration path and prove call routing",
         ),
         component(
             "plugin-registry",
-            deployed=False,
-            running=False,
-            callable_=False,
             evidence=["no runtime registration evidence collected for plugin-registry"],
             next_action="register through bounded OpenWebUI integration path and prove permission enforcement",
         ),
         component(
             "dashboard-snapshot",
-            deployed=False,
-            running=False,
-            callable_=False,
             evidence=["no dashboard runtime artifact collected"],
             next_action="generate dashboard from verified automation ledger evidence",
         ),
         component(
             "shift-handoff",
-            deployed=False,
-            running=False,
-            callable_=False,
             evidence=["no handoff runtime artifact collected"],
             next_action="generate handoff from verified runtime ledger evidence",
         ),
@@ -256,18 +284,16 @@ def collect() -> dict[str, Any]:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "side_effects": "none",
-        "container": {
-            "name": container,
-            "running": container_running,
-            "image": image,
-        },
+        "container": {"name": container, "running": container_running, "image": image},
         "openwebui": {
             "metadata_query_ok": webui.get("ok") is True,
             "model_ids": sorted(model_rows),
             "tool_ids": sorted(tool_ids),
+            "active_skill_ids": sorted(active_skill_ids),
             "trading_tool_ids": sorted(trading_tools),
             "trading_skill_ids": sorted(trading_skills),
             "trading_knowledge": sorted(knowledge_names),
+            "nontrading_binding_audit": binding_rows,
         },
         "workers": {
             "discovery_service": discovery_service,
@@ -279,6 +305,7 @@ def collect() -> dict[str, Any]:
             "status": status_file,
             "scan": scan_file,
             "instrument_cache": cache_file,
+            "instrument_cache_status": cache_status_file,
             "automation_ledger": automation_file,
         },
         "components": components,
