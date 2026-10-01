@@ -26,6 +26,7 @@ CONFIG_FILES = [
     "webui-control/shift-handoff-schema.json",
     "webui-control/books-pipeline.json",
     "webui-control/you-heal-pipeline.json",
+    "webui-control/dashboard-schema.json",
     "webui-control/release-manifest.json",
 ]
 
