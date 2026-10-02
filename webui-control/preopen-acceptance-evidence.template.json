@@ -1,0 +1,19 @@
+{
+  "generated_at": null,
+  "environment": "DEMO",
+  "live_trading_enabled": false,
+  "note": "Template only. MISSING is not acceptance; replace only with fresh runtime test evidence.",
+  "checks": {
+    "instrument_mapping": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "relative_volume": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "catalyst_news": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "liquidity_spread": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "cause_effect": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "methodology_risk": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "demo_order_cycle": {"status": "MISSING", "evidence": [], "blocker": "separately authorised DEMO acceptance evidence not recorded"},
+    "position_lifecycle": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "equity_curve": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "automation_owner": {"status": "MISSING", "evidence": [], "blocker": "runtime test not recorded"},
+    "session_authority": {"status": "MISSING", "evidence": [], "blocker": "exact DEMO-only unattended authority and approval behavior not recorded"}
+  }
+}

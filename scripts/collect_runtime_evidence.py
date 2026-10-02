@@ -186,6 +186,7 @@ def collect() -> dict[str, Any]:
     cache_status_file = file_summary(state_dir / "t212_instrument_cache_status.json")
     automation_file = file_summary(state_dir / "automation_runs.jsonl")
     dashboard_file = file_summary(state_dir / "trading_dashboard_latest.json")
+    readiness_gate_file = file_summary(state_dir / "preopen_readiness_latest.json")
 
     webui_evidence = [
         f"container_running={container_running}",
@@ -283,6 +284,18 @@ def collect() -> dict[str, Any]:
             ),
         ),
         component(
+            "preopen-readiness-gate",
+            deployed=readiness_gate_file["present"],
+            running=False,
+            evidence=[f"preopen_readiness={readiness_gate_file}"],
+            blocker=None if readiness_gate_file["present"] else "no pre-open readiness artifact found",
+            next_action=(
+                "inspect PASS/FAIL/MISSING rows; NO_GO remains authoritative with any gap"
+                if readiness_gate_file["present"]
+                else "build the pre-open gate from fresh runtime, dashboard and acceptance evidence"
+            ),
+        ),
+        component(
             "shift-handoff",
             evidence=["no handoff runtime artifact collected"],
             next_action="generate handoff from verified runtime ledger evidence",
@@ -316,6 +329,7 @@ def collect() -> dict[str, Any]:
             "instrument_cache_status": cache_status_file,
             "automation_ledger": automation_file,
             "trading_dashboard": dashboard_file,
+            "preopen_readiness": readiness_gate_file,
         },
         "components": components,
     }

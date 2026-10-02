@@ -210,6 +210,9 @@ def build_trading_dashboard(
             "qualified": int((scanner or {}).get("qualified_count") or 0),
             "top_winners": _top_winners(market_rows),
             "new_on_t212": list((new_instruments or {}).get("instruments") or []),
+            "new_on_t212_baseline_verified": (
+                (new_instruments or {}).get("baseline_was_present") is True
+            ),
             "market_data_truth_only": True,
         },
         "decision": {
