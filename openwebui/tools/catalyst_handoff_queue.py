@@ -134,18 +134,22 @@ class CatalystHandoffQueue:
     def acknowledge(
         self,
         event_id: str,
+        outcome: str = "done",
+        result: dict[str, Any] | None = None,
         *,
-        result: dict[str, Any],
         now: datetime | None = None,
     ) -> dict[str, Any] | None:
+        if outcome not in FINAL_STATES:
+            raise ValueError("queue acknowledgement outcome must be done or failed")
         observed = self._now(now)
         rows = self._read()
         changed = None
         for row in rows:
             if row.get("id") == event_id and row.get("status") == "claimed":
-                row["status"] = "done"
+                row["status"] = outcome
                 row["completed_at"] = observed.isoformat()
-                row["result"] = result
+                if result is not None:
+                    row["result"] = result
                 row.pop("lease_expires_at", None)
                 changed = row
                 break
