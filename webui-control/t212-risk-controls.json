@@ -15,6 +15,7 @@
     "normal_session_spread_ceiling_pct_midpoint": 2.5,
     "max_expected_friction_pct_planned_risk": 25.0,
     "proposal_validity_seconds": 900,
+    "broker_snapshot_validity_seconds": 120,
     "reprice_rescale_if_reference_price_move_pct": 1.0,
     "overnight_holding_default": false,
     "long_only": true,

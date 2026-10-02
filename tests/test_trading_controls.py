@@ -26,6 +26,9 @@ class TradingControlTests(unittest.TestCase):
     def portfolio(self):
         return {
             "broker_verified": True,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "environment": "DEMO",
+            "live_trading_enabled": False,
             "equity": 500,
             "available_cash": 500,
             "pending_commitments": 0,
@@ -51,6 +54,23 @@ class TradingControlTests(unittest.TestCase):
         result = evaluate(self.proposal(), portfolio)
         self.assertEqual(result["decision"], "REJECT")
         self.assertIn("BROKER_STATE_UNVERIFIED", result["reasons"])
+
+    def test_risk_gate_rejects_stale_or_unsafe_broker_state(self):
+        portfolio = self.portfolio()
+        portfolio["generated_at"] = "2026-01-01T00:00:00Z"
+        result = evaluate(
+            self.proposal(),
+            portfolio,
+            now=datetime(2026, 1, 1, 0, 3, tzinfo=timezone.utc),
+        )
+        self.assertEqual(result["decision"], "REJECT")
+        self.assertIn("BROKER_STATE_STALE", result["reasons"])
+
+        portfolio = self.portfolio()
+        portfolio["live_trading_enabled"] = True
+        result = evaluate(self.proposal(), portfolio)
+        self.assertEqual(result["decision"], "REJECT")
+        self.assertIn("BROKER_ENVIRONMENT_UNSAFE", result["reasons"])
 
     def test_execution_transition_requires_approval_and_authorization(self):
         record = self.proposal()

@@ -41,6 +41,10 @@ class SystemdReadinessTests(unittest.TestCase):
             "ExecStartPost=/usr/bin/python3 /home/katie/t212-scanner/worker/run_catalyst_consumer.py",
             discovery,
         )
+        self.assertIn(
+            "ExecStartPost=/usr/bin/python3 /home/katie/t212-scanner/worker/run_candidate_readiness.py",
+            discovery,
+        )
 
     def test_all_worker_services_are_bounded_and_retry_failures(self):
         for path in SERVICES:
@@ -73,11 +77,16 @@ class SystemdReadinessTests(unittest.TestCase):
         self.assertNotIn("https://api.trading212.com/", worker)
 
     def test_catalyst_consumer_has_no_broker_write_authority(self):
-        consumer = (ROOT / "worker" / "run_catalyst_consumer.py").read_text(encoding="utf-8")
-        for forbidden in ("trading212.com", "place_order(", "submit_order(", "close_position("):
-            self.assertNotIn(forbidden, consumer.lower())
-        self.assertIn("T212_CATALYST_REVIEW_URL", consumer)
-        self.assertIn('"orders_submitted": 0', consumer)
+        consumers = [
+            (ROOT / "worker" / "run_catalyst_consumer.py").read_text(encoding="utf-8"),
+            (ROOT / "worker" / "run_candidate_readiness.py").read_text(encoding="utf-8"),
+        ]
+        for consumer in consumers:
+            for forbidden in ("trading212.com", "place_order(", "submit_order(", "close_position("):
+                self.assertNotIn(forbidden, consumer.lower())
+            self.assertIn('"orders_submitted": 0', consumer)
+        self.assertIn("T212_CATALYST_REVIEW_URL", consumers[0])
+        self.assertIn("trading_dashboard()", consumers[1])
 
     def test_scheduled_workers_do_not_submit_orders(self):
         paths = [

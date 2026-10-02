@@ -40,3 +40,12 @@ Closed-market fixtures must use `source_kind = closed_market_fixture` and are
 rejected by the runtime loader unless an offline test explicitly opts in. They
 may prove deterministic logic only and must never be described as fresh market
 evidence.
+
+
+## Catalyst-to-broker readiness stage
+
+The staged `worker/run_candidate_readiness.py` consumes only completed, schema-validated catalyst reviews. It rejects watch/unknown catalysts, non-qualified scanner rows, non-tradable instruments and spreads above 2.5% before any broker request.
+
+A Trading 212 DEMO dashboard read is made only when at least one candidate survives those gates. The normalized evidence must show DEMO, LIVE disabled, GBP equity/cash, positions and pending orders. Passing this stage means only `READY_FOR_PROPOSAL`; the deterministic risk gate remains `PENDING_IMMUTABLE_PROPOSAL` and no order is authorized.
+
+The risk gate now rejects broker evidence that is missing its timestamp, older than 120 seconds, non-DEMO or LIVE-enabled. This prevents a stale `broker_verified=true` flag from being treated as current broker truth.

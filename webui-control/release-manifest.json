@@ -1,5 +1,5 @@
 {
-  "version": "0.9",
+  "version": "0.10",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
@@ -119,6 +119,11 @@
       "id": "catalyst-queue-consumer",
       "config": null,
       "code": "worker/run_catalyst_consumer.py"
+    },
+    {
+      "id": "candidate-readiness",
+      "config": "webui-control/t212-risk-controls.json",
+      "code": "worker/run_candidate_readiness.py"
     },
     {
       "id": "discovery-session-gate",

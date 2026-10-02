@@ -76,6 +76,30 @@ def evaluate(
             "reasons": ["BROKER_STATE_UNVERIFIED"],
             "metrics": {},
         }
+    if portfolio.get("environment") != "DEMO" or portfolio.get("live_trading_enabled") is not False:
+        return {
+            "decision": "REJECT",
+            "reasons": ["BROKER_ENVIRONMENT_UNSAFE"],
+            "metrics": {},
+        }
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    try:
+        broker_generated = _parse_time(str(portfolio.get("generated_at") or ""))
+    except RiskGateError:
+        return {
+            "decision": "REJECT",
+            "reasons": ["BROKER_STATE_UNVERIFIED"],
+            "metrics": {},
+        }
+    broker_age_seconds = max(0.0, (current - broker_generated).total_seconds())
+    if broker_age_seconds > _num(
+        rules["broker_snapshot_validity_seconds"], "broker snapshot validity"
+    ):
+        return {
+            "decision": "REJECT",
+            "reasons": ["BROKER_STATE_STALE"],
+            "metrics": {"broker_age_seconds": round(broker_age_seconds, 2)},
+        }
 
     equity = _num(portfolio.get("equity"), "portfolio.equity")
     cash = _num(portfolio.get("available_cash"), "portfolio.available_cash")
@@ -141,7 +165,6 @@ def evaluate(
     ):
         reasons.append("FRICTION_LIMIT")
 
-    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     generated = _parse_time(str(proposal.get("generated_at") or ""))
     age_seconds = max(0.0, (current - generated).total_seconds())
     if age_seconds > _num(rules["proposal_validity_seconds"], "proposal validity"):
@@ -201,6 +224,7 @@ def evaluate(
             "max_aggregate_open_risk": round(max_aggregate, 4),
             "reward_risk": round(reward_risk, 4),
             "proposal_age_seconds": round(age_seconds, 2),
+            "broker_age_seconds": round(broker_age_seconds, 2),
             "reference_move_pct": round(reference_move_pct, 4) if reference_move_pct is not None else None,
         },
         "safety": {

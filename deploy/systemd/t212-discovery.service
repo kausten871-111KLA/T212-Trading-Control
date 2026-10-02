@@ -15,6 +15,7 @@ EnvironmentFile=-/etc/t212-scanner/runtime.env
 ExecStartPre=/usr/bin/python3 /home/katie/t212-scanner/worker/produce_market_snapshot.py
 ExecStart=/usr/bin/python3 /home/katie/t212-scanner/worker/run_discovery_cycle.py
 ExecStartPost=/usr/bin/python3 /home/katie/t212-scanner/worker/run_catalyst_consumer.py
+ExecStartPost=/usr/bin/python3 /home/katie/t212-scanner/worker/run_candidate_readiness.py
 TimeoutStartSec=4min
 Restart=on-failure
 RestartSec=30s

@@ -104,6 +104,22 @@ class CatalystHandoffQueue:
         ]
         return claimable[: max(1, int(limit))]
 
+    def completed(
+        self,
+        limit: int = 20,
+        *,
+        session_date: str | None = None,
+        now: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        target_date = session_date or self._today(now)
+        rows = [
+            row
+            for row in self._read()
+            if row.get("status") == "done" and row.get("session_date") == target_date
+        ]
+        rows.sort(key=lambda row: str(row.get("completed_at") or row.get("queued_at") or ""), reverse=True)
+        return rows[: max(1, int(limit))]
+
     def claim(
         self,
         event_id: str,
