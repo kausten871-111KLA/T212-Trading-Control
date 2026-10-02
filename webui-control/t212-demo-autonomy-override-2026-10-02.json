@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "effective_date": "2026-10-02",
+  "scope": "T212 DEMO only",
+  "precedence": "Current explicit Katie directive; supersedes older read-only and per-trade approval assumptions for DEMO.",
+  "environment": {
+    "demo_execution_enabled": true,
+    "live_trading_enabled": false,
+    "live_environment_must_remain_inaccessible": true,
+    "human_approval_required_per_demo_trade": false,
+    "forced_or_invented_trade_allowed": false,
+    "broker_evidence_required_for_fill_position_pnl_claims": true
+  },
+  "operating_objective": {
+    "primary": "Run the complete methodology in DEMO, execute qualifying DEMO trades, measure whether the process can improve account equity, and learn from every surfaced/qualified/rejected/executed outcome.",
+    "zero_trade_day": "OPERATIONAL_EXCEPTION_REQUIRING_ROOT_CAUSE",
+    "do_not_weaken_hard_controls_silently": true
+  },
+  "runtime_architecture": {
+    "deterministic_scan_cadence": "5 minutes inside approved US outer session boundary",
+    "deterministic_scan_must_not_open_llm_chat": true,
+    "llm_reasoning": "event-driven for candidates/catalysts/decisions plus bounded supervisory runs",
+    "single_runtime_owner_required": true,
+    "shared_persistent_state_required": true,
+    "reconcile_broker_before_order_write": true,
+    "persistent_cross-run_order_dedup_required": true
+  },
+  "priority_repairs": [
+    "Deploy one cache-first T212 gateway implementation and remove metadata-per-lookup path",
+    "Add shared cross-process order-intent lock/dedup and broker reconcile-before-write",
+    "Add DEMO limit, stop and stop-limit order support using official T212 Public API endpoints",
+    "Wire Alpaca /v1beta1/news using existing server-side Alpaca credentials before adding another paid news provider",
+    "Wire computed RVOL and S_trade/p_green into the actual runtime decision path rather than leaving them as staged code/config",
+    "Persist the 20-trade validation ledger and missed-greens outcome loop",
+    "Derive New-on-T212 from daily instrument-cache diffs; manual T212 app lists are optional comparison evidence, not an operating dependency",
+    "Prove runtime bindings for Market Intelligence, Decision, Execution/Position Control and Learning/QA"
+  ],
+  "credit_control": {
+    "do_not_use_repetitive_chat_as_timer": true,
+    "prefer_workers_state_and_event_triggers": true,
+    "measure_model_calls_per_session": true
+  }
+}
