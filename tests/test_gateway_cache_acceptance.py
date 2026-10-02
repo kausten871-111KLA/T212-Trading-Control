@@ -77,6 +77,7 @@ class GatewayCacheAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(all(result[0]["ticker"] == "ACME_US_EQ" for result in results))
             self.assertTrue(all(result[0]["cacheSource"] == "disk" for result in results[1:]))
             self.assertEqual(os.stat(tool.instrument_cache.cache_path).st_mode & 0o777, 0o600)
+            self.assertEqual(os.stat(tool.instrument_cache.lock_path).st_mode & 0o777, 0o600)
 
     async def test_concurrent_lookups_share_one_refresh(self):
         instruments = [{"ticker": "ABC_US_EQ", "name": "ABC", "type": "STOCK"}]

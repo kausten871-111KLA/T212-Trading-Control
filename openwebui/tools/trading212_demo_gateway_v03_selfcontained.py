@@ -36,6 +36,7 @@ class InstrumentCache:
         """Serialise refreshes across Open WebUI workers and the host cache worker."""
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         handle = self.lock_path.open("a+")
+        os.chmod(self.lock_path, 0o600)
         try:
             if fcntl is not None:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)

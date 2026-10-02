@@ -33,6 +33,7 @@ class InstrumentCache:
     def lock(self):
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         handle = self.lock_path.open("a+")
+        self.lock_path.chmod(0o600)
         try:
             if fcntl is not None:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
