@@ -1,8 +1,9 @@
 {
-  "version": "0.1",
+  "version": "0.2",
   "workspace": "t212-demo",
   "status": "STAGED_NOT_DEPLOYED",
   "runtime_agents_proven": false,
+  "current_demo_override": "webui-control/t212-demo-autonomy-override-2026-10-02.json",
   "roles": [
     {
       "id": "market-intelligence",
@@ -30,8 +31,10 @@
       "binding_state": "CONFIGURED_ROLE",
       "runtime_state": "UNVERIFIED",
       "persistent_agent": false,
-      "broker_write_authority": false,
-      "inputs": ["approved_immutable_proposal"],
+      "broker_write_authority": "DEMO_ONLY_WHEN_CURRENT_OVERRIDE_AND_GATES_PASS",
+      "live_broker_write_authority": false,
+      "human_approval_required_per_demo_trade": false,
+      "inputs": ["qualified_immutable_demo_proposal", "broker_reconciliation"],
       "outputs": ["broker_verified_execution_evidence"]
     },
     {
@@ -50,19 +53,19 @@
       "id": "OPERATING_WINDOW_SCOPE",
       "register": "Weekdays 14:20-21:05 Europe/London outer boundary",
       "canonical": "UK_OPEN, US_OPEN and US_CLOSE are named methodology windows",
-      "resolution": "Retain the register boundary as the outer safety gate; do not activate UK_OPEN without a separate approved feed-ready schedule."
+      "resolution": "Retain the register boundary as the current outer gate for the US lane; do not activate UK_OPEN without a separate feed-ready decision."
     },
     {
       "id": "ZERO_ACTION_PRESSURE",
-      "system_prompt": "Avoid zero-action days when a valid approved DEMO opportunity exists",
-      "safety_boundary": "Never invent a candidate, force a trade, weaken a gate or bypass exact human approval",
-      "resolution": "The safety boundary wins; no-action with a coded reason is valid."
+      "current_user_directive": "DEMO must operate without per-trade approval and demonstrate the methodology through actual DEMO execution",
+      "safety_boundary": "Never invent evidence, create a LIVE order, blindly retry a non-idempotent write or silently weaken hard risk/data controls",
+      "resolution": "Execute qualifying DEMO trades under the current override. If none execute on an open-market day, classify the exact upstream operational failure and repair it."
     },
     {
       "id": "ROLE_VS_AGENT_RUNTIME",
       "repository": "Role prompts, skills and workspace names exist",
-      "runtime": "No persistent runtime agent binding has been verified",
-      "resolution": "Label all four as configured roles with runtime UNVERIFIED until server evidence proves persistence."
+      "runtime": "No persistent runtime agent binding has been independently verified in this repository lane",
+      "resolution": "Keep runtime UNVERIFIED until server/WebUI evidence proves actual bindings and persistence."
     }
   ]
 }
