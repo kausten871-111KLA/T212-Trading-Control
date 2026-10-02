@@ -58,3 +58,24 @@ Unsourced social posts do not count as confirmation.
 
 ## Safety
 This handoff never places an order. It only annotates scanner candidates for the downstream DEMO trading workflow.
+
+## Queue consumer
+
+`worker/run_catalyst_consumer.py` is the bounded consumer for this contract. It:
+- runs only inside the deterministic Europe/London session gate;
+- processes at most five events per invocation and twenty enqueues per UTC day;
+- claims each event with a lease, recovers expired claims, and retries at most three times;
+- validates the exact output schema, symbol identity, state/disposition enum, source requirement and confidence range before acknowledgement;
+- persists completed review evidence and leaves failed events visible;
+- contains no Trading 212, broker-write or order-mutation authority.
+
+The systemd discovery service stages this consumer after the no-order discovery worker. Missing reviewer configuration records a blocked status while preserving queued work; it does not silently discard candidates.
+
+## Server-side configuration
+
+The following values belong only in the root-controlled runtime environment and must never be committed or pasted into chat:
+- `T212_CATALYST_REVIEW_URL` — approved OpenAI-compatible chat-completions endpoint;
+- `T212_CATALYST_REVIEW_TOKEN` — server-side bearer token;
+- `WEBUI_MODEL_DEEP_REASONING` — approved model identifier.
+
+Optional bounded controls are `T212_CATALYST_TIMEOUT_SECONDS`, `T212_CATALYST_MAX_ATTEMPTS`, `T212_CATALYST_LEASE_SECONDS`, `T212_CATALYST_MAX_PER_RUN` and `T212_CATALYST_MAX_PER_DAY`. The code caps per-run work at five even if a higher value is supplied.

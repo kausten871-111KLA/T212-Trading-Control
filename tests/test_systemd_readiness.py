@@ -37,6 +37,10 @@ class SystemdReadinessTests(unittest.TestCase):
             discovery,
         )
         self.assertIn("EnvironmentFile=-/etc/t212-scanner/runtime.env", discovery)
+        self.assertIn(
+            "ExecStartPost=/usr/bin/python3 /home/katie/t212-scanner/worker/run_catalyst_consumer.py",
+            discovery,
+        )
 
     def test_all_worker_services_are_bounded_and_retry_failures(self):
         for path in SERVICES:
@@ -67,6 +71,13 @@ class SystemdReadinessTests(unittest.TestCase):
         self.assertIn("https://demo.trading212.com/", worker)
         self.assertNotIn("https://live.trading212.com/", worker)
         self.assertNotIn("https://api.trading212.com/", worker)
+
+    def test_catalyst_consumer_has_no_broker_write_authority(self):
+        consumer = (ROOT / "worker" / "run_catalyst_consumer.py").read_text(encoding="utf-8")
+        for forbidden in ("trading212.com", "place_order(", "submit_order(", "close_position("):
+            self.assertNotIn(forbidden, consumer.lower())
+        self.assertIn("T212_CATALYST_REVIEW_URL", consumer)
+        self.assertIn('"orders_submitted": 0', consumer)
 
     def test_scheduled_workers_do_not_submit_orders(self):
         paths = [

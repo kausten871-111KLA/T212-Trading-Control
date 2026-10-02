@@ -1,5 +1,5 @@
 {
-  "version": "0.8",
+  "version": "0.9",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
@@ -114,6 +114,11 @@
       "id": "discovery-worker",
       "config": null,
       "code": "worker/run_discovery_cycle.py"
+    },
+    {
+      "id": "catalyst-queue-consumer",
+      "config": null,
+      "code": "worker/run_catalyst_consumer.py"
     },
     {
       "id": "discovery-session-gate",
