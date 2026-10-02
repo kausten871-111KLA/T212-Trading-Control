@@ -1,5 +1,5 @@
 {
-  "version": "0.10",
+  "version": "0.11",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
@@ -74,6 +74,16 @@
       "id": "t212-methodology",
       "config": "webui-control/t212-methodology.json",
       "code": null
+    },
+    {
+      "id": "t212-agent-bindings",
+      "config": "webui-control/t212-agent-bindings.json",
+      "code": null
+    },
+    {
+      "id": "trading-dashboard-evidence",
+      "config": "webui-control/t212-agent-bindings.json",
+      "code": "openwebui/tools/trading_dashboard_evidence.py"
     },
     {
       "id": "t212-implementation-map",

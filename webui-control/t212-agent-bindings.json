@@ -1,0 +1,68 @@
+{
+  "version": "0.1",
+  "workspace": "t212-demo",
+  "status": "STAGED_NOT_DEPLOYED",
+  "runtime_agents_proven": false,
+  "roles": [
+    {
+      "id": "market-intelligence",
+      "name": "Market Intelligence",
+      "binding_state": "CONFIGURED_ROLE",
+      "runtime_state": "UNVERIFIED",
+      "persistent_agent": false,
+      "broker_write_authority": false,
+      "inputs": ["market_snapshot.json", "scanner_latest.json"],
+      "outputs": ["catalyst_handoff_queue.jsonl"]
+    },
+    {
+      "id": "decision-engine",
+      "name": "Decision Engine",
+      "binding_state": "CONFIGURED_ROLE",
+      "runtime_state": "UNVERIFIED",
+      "persistent_agent": false,
+      "broker_write_authority": false,
+      "inputs": ["catalyst_handoff_queue.jsonl", "broker_snapshot.json"],
+      "outputs": ["candidate_readiness.json"]
+    },
+    {
+      "id": "execution-position-control",
+      "name": "Execution & Position Control",
+      "binding_state": "CONFIGURED_ROLE",
+      "runtime_state": "UNVERIFIED",
+      "persistent_agent": false,
+      "broker_write_authority": false,
+      "inputs": ["approved_immutable_proposal"],
+      "outputs": ["broker_verified_execution_evidence"]
+    },
+    {
+      "id": "learning-qa",
+      "name": "Learning & QA",
+      "binding_state": "CONFIGURED_ROLE",
+      "runtime_state": "UNVERIFIED",
+      "persistent_agent": false,
+      "broker_write_authority": false,
+      "inputs": ["trading_dashboard_evidence", "eod_audit"],
+      "outputs": ["one_evidence_backed_improvement"]
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "OPERATING_WINDOW_SCOPE",
+      "register": "Weekdays 14:20-21:05 Europe/London outer boundary",
+      "canonical": "UK_OPEN, US_OPEN and US_CLOSE are named methodology windows",
+      "resolution": "Retain the register boundary as the outer safety gate; do not activate UK_OPEN without a separate approved feed-ready schedule."
+    },
+    {
+      "id": "ZERO_ACTION_PRESSURE",
+      "system_prompt": "Avoid zero-action days when a valid approved DEMO opportunity exists",
+      "safety_boundary": "Never invent a candidate, force a trade, weaken a gate or bypass exact human approval",
+      "resolution": "The safety boundary wins; no-action with a coded reason is valid."
+    },
+    {
+      "id": "ROLE_VS_AGENT_RUNTIME",
+      "repository": "Role prompts, skills and workspace names exist",
+      "runtime": "No persistent runtime agent binding has been verified",
+      "resolution": "Label all four as configured roles with runtime UNVERIFIED until server evidence proves persistence."
+    }
+  ]
+}
