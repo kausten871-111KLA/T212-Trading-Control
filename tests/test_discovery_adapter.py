@@ -18,7 +18,7 @@ class DiscoveryAdapterTests(unittest.TestCase):
                 "row_freshness_enforced": True,
                 "rows": [{"symbol": "ABC", "observation_age_seconds": 50}],
             }), encoding="utf-8")
-            self.assertEqual(load_snapshot(path, max_age_seconds=100, now_epoch=1050)["source"], "fixture")
+            self.assertEqual(load_snapshot(path, max_age_seconds=100, now_epoch=1050)["source"], "alpaca:test")
             with self.assertRaises(DiscoveryInputError):
                 load_snapshot(path, max_age_seconds=100, now_epoch=1200)
 
