@@ -30,6 +30,14 @@ class SystemdReadinessTests(unittest.TestCase):
         self.assertNotIn("OnCalendar=*:0/5", discovery)
         self.assertIn("Persistent=true", discovery)
 
+    def test_discovery_service_produces_snapshot_before_scanning(self):
+        discovery = self.read("t212-discovery.service")
+        self.assertIn(
+            "ExecStartPre=/usr/bin/python3 /home/katie/t212-scanner/worker/produce_market_snapshot.py",
+            discovery,
+        )
+        self.assertIn("EnvironmentFile=-/etc/t212-scanner/runtime.env", discovery)
+
     def test_all_worker_services_are_bounded_and_retry_failures(self):
         for path in SERVICES:
             text = path.read_text(encoding="utf-8")
@@ -63,6 +71,7 @@ class SystemdReadinessTests(unittest.TestCase):
     def test_scheduled_workers_do_not_submit_orders(self):
         paths = [
             ROOT / "scripts" / "refresh_t212_cache_worker.py",
+            ROOT / "worker" / "produce_market_snapshot.py",
             ROOT / "worker" / "run_discovery_cycle.py",
             ROOT / "worker" / "run_eod_audit.py",
         ]

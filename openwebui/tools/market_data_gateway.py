@@ -132,6 +132,7 @@ class Tools:
             "dayHigh": daily_bar.get("h"),
             "dayLow": daily_bar.get("l"),
             "previousClose": prev_close,
+            "previousVolume": prev_bar.get("v"),
             "quoteTimestamp": latest_quote.get("t"),
             "tradeTimestamp": latest_trade.get("t"),
         }

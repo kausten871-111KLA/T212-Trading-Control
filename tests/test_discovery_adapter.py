@@ -11,9 +11,12 @@ class DiscoveryAdapterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "snapshot.json"
             path.write_text(json.dumps({
-                "source": "fixture",
+                "source": "alpaca:test",
+                "source_kind": "live_provider",
+                "fixture": False,
                 "generated_at": 1000,
-                "rows": [{"symbol": "ABC"}],
+                "row_freshness_enforced": True,
+                "rows": [{"symbol": "ABC", "observation_age_seconds": 50}],
             }), encoding="utf-8")
             self.assertEqual(load_snapshot(path, max_age_seconds=100, now_epoch=1050)["source"], "fixture")
             with self.assertRaises(DiscoveryInputError):

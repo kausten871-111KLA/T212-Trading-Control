@@ -11,6 +11,8 @@ User=katie
 WorkingDirectory=/home/katie/t212-scanner
 Environment=PYTHONUNBUFFERED=1
 Environment=T212_SCANNER_STATE_DIR=/var/lib/t212-scanner
+EnvironmentFile=-/etc/t212-scanner/runtime.env
+ExecStartPre=/usr/bin/python3 /home/katie/t212-scanner/worker/produce_market_snapshot.py
 ExecStart=/usr/bin/python3 /home/katie/t212-scanner/worker/run_discovery_cycle.py
 TimeoutStartSec=4min
 Restart=on-failure

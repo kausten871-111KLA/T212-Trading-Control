@@ -32,7 +32,13 @@ def _parse_timestamp(value: Any) -> float:
         raise DiscoveryInputError("market snapshot generated_at is invalid") from exc
 
 
-def load_snapshot(path: str | Path, *, max_age_seconds: int = 300, now_epoch: float | None = None) -> dict[str, Any]:
+def load_snapshot(
+    path: str | Path,
+    *,
+    max_age_seconds: int = 300,
+    now_epoch: float | None = None,
+    allow_fixture: bool = False,
+) -> dict[str, Any]:
     source = Path(path)
     try:
         payload = json.loads(source.read_text(encoding="utf-8"))
@@ -56,11 +62,41 @@ def load_snapshot(path: str | Path, *, max_age_seconds: int = 300, now_epoch: fl
     if not source_name:
         raise DiscoveryInputError("market snapshot is missing source")
 
+    source_kind = str(payload.get("source_kind") or "").strip().lower()
+    is_fixture = bool(payload.get("fixture")) or source_kind == "closed_market_fixture"
+    if is_fixture and not allow_fixture:
+        raise DiscoveryInputError("closed-market fixture is not valid live discovery input")
+    if not is_fixture and source_kind != "live_provider":
+        raise DiscoveryInputError("market snapshot source_kind is not live_provider")
+    if payload.get("row_freshness_enforced") is not True:
+        raise DiscoveryInputError("market snapshot lacks row-level freshness evidence")
+
+    checked_rows = []
+    for row in payload["rows"]:
+        if not isinstance(row, dict):
+            continue
+        try:
+            row_age = float(row.get("observation_age_seconds"))
+        except (TypeError, ValueError) as exc:
+            raise DiscoveryInputError(
+                "market snapshot row lacks observation freshness"
+            ) from exc
+        if row_age < 0 or row_age > max(1, int(max_age_seconds)):
+            raise DiscoveryInputError(
+                f"market snapshot contains stale observation ({round(row_age, 1)}s old)"
+            )
+        checked_rows.append(row)
+
+    if not checked_rows:
+        raise DiscoveryInputError("market snapshot has no freshness-checked rows")
+
     return {
         "source": source_name,
+        "source_kind": source_kind,
+        "fixture": is_fixture,
         "generated_at_epoch": generated,
         "age_seconds": round(age, 3),
-        "rows": payload["rows"],
+        "rows": checked_rows,
     }
 
 

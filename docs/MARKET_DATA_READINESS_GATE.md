@@ -23,3 +23,20 @@ Alpaca's stock movers endpoint is expected to show the previous market day's mov
 - require current snapshots/quotes for pre-market qualification;
 - require current-session screeners after the market opens;
 - alert only when a screener remains on the prior session after the regular-market reset grace period.
+
+
+## Row-level freshness acceptance
+
+A newly-written file is not sufficient evidence that its market observations are
+fresh. Runtime discovery now requires:
+
+- `source_kind = live_provider`;
+- `fixture = false`;
+- `row_freshness_enforced = true`;
+- every accepted row to carry `observation_age_seconds` within the configured
+  maximum (default 300 seconds).
+
+Closed-market fixtures must use `source_kind = closed_market_fixture` and are
+rejected by the runtime loader unless an offline test explicitly opts in. They
+may prove deterministic logic only and must never be described as fresh market
+evidence.

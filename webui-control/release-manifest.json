@@ -1,5 +1,5 @@
 {
-  "version": "0.7",
+  "version": "0.8",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
@@ -104,6 +104,11 @@
       "id": "discovery-adapter",
       "config": null,
       "code": "worker/discovery_adapter.py"
+    },
+    {
+      "id": "market-snapshot-producer",
+      "config": null,
+      "code": "worker/produce_market_snapshot.py"
     },
     {
       "id": "discovery-worker",

@@ -22,3 +22,27 @@ Alpaca documents that the stock movers endpoint resets at the regular market ope
 ## Safety / execution boundary
 
 This document controls discovery freshness and qualification. Trading 212 remains DEMO-only; LIVE stays disabled.
+
+
+## Implemented branch-side producer contract
+
+The staged host worker now has an explicit read-only producer at
+`worker/produce_market_snapshot.py`. The systemd discovery service runs it as
+`ExecStartPre`, inside the same deterministic session window, before the
+scanner reads `market_snapshot.json`.
+
+The producer:
+
+- obtains the Alpaca market clock;
+- combines broad movers and most-active discovery through `candidate_scan`;
+- captures quote/trade/day/previous-day snapshot fields;
+- calculates a completed-20-day volume baseline where daily bars are available;
+- labels the explicit previous-session-volume fallback when bars are unavailable;
+- rejects missing or stale quote/trade observations before writing;
+- records provider/feed, screener errors, clock state and freshness evidence;
+- has no T212 or Alpaca order endpoint and reports `orders_submitted=0`.
+
+This is **STAGED**, not proof that host Alpaca credentials or a live producer run
+exist. The service references only the root-controlled path
+`/etc/t212-scanner/runtime.env`; secret values must never be committed or
+pasted into chat.
