@@ -108,6 +108,21 @@ class TradingDashboardEvidenceTests(unittest.TestCase):
         self.assertTrue(all(not row["persistent_agent"] for row in result["agent_roles"]))
         self.assertTrue(all(not row["broker_write_authority"] for row in result["agent_roles"]))
 
+    def test_missed_green_audit_is_reported_without_auto_applying_thresholds(self):
+        result = build_trading_dashboard(
+            eod_audit={
+                "environment": "DEMO",
+                "generated_at": "2026-10-02T14:24:50Z",
+                "orders_submitted": 0,
+                "audit": {"counts": {"NEV": 1}, "rows": [{"symbol": "BBB"}]},
+            },
+            generated_at=NOW,
+        )
+        audit = result["learning"]["missed_green_audit"]
+        self.assertEqual(audit["state"], "VERIFIED_ARTIFACT")
+        self.assertEqual(audit["counts"]["NEV"], 1)
+        self.assertFalse(audit["threshold_changes_auto_applied"])
+
 
 if __name__ == "__main__":
     unittest.main()

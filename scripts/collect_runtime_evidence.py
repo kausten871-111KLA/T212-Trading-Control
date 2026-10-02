@@ -185,6 +185,7 @@ def collect() -> dict[str, Any]:
     cache_file = file_summary(state_dir / "t212_instrument_cache.json")
     cache_status_file = file_summary(state_dir / "t212_instrument_cache_status.json")
     automation_file = file_summary(state_dir / "automation_runs.jsonl")
+    dashboard_file = file_summary(state_dir / "trading_dashboard_latest.json")
 
     webui_evidence = [
         f"container_running={container_running}",
@@ -271,8 +272,15 @@ def collect() -> dict[str, Any]:
         ),
         component(
             "dashboard-snapshot",
-            evidence=["no dashboard runtime artifact collected"],
-            next_action="generate dashboard from verified automation ledger evidence",
+            deployed=dashboard_file["present"],
+            running=False,
+            evidence=[f"trading_dashboard={dashboard_file}"],
+            blocker=None if dashboard_file["present"] else "no trading dashboard runtime artifact found",
+            next_action=(
+                "inspect freshness and blocked evidence in trading_dashboard_latest.json"
+                if dashboard_file["present"]
+                else "run the read-only trading dashboard builder from verified state files"
+            ),
         ),
         component(
             "shift-handoff",
@@ -307,6 +315,7 @@ def collect() -> dict[str, Any]:
             "instrument_cache": cache_file,
             "instrument_cache_status": cache_status_file,
             "automation_ledger": automation_file,
+            "trading_dashboard": dashboard_file,
         },
         "components": components,
     }

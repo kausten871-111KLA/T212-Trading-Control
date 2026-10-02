@@ -112,6 +112,7 @@ def build_trading_dashboard(
     readiness: Mapping[str, Any] | None = None,
     new_instruments: Mapping[str, Any] | None = None,
     execution_evidence: Mapping[str, Any] | None = None,
+    eod_audit: Mapping[str, Any] | None = None,
     agent_bindings: Mapping[str, Any] | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
@@ -125,6 +126,7 @@ def build_trading_dashboard(
         "readiness": readiness,
         "new_instruments": new_instruments,
         "execution_evidence": execution_evidence,
+        "eod_audit": eod_audit,
     }
     for name, artifact in artifacts.items():
         _assert_demo(artifact, name)
@@ -159,6 +161,9 @@ def build_trading_dashboard(
     rejected = list((scanner or {}).get("rejected") or [])
     candidates = list((readiness or {}).get("candidates") or [])
     fills = list((execution_evidence or {}).get("broker_verified_fills") or [])
+    audit = (eod_audit or {}).get("audit") or {}
+    audit_counts = dict(audit.get("counts") or {})
+    audit_rows = list(audit.get("rows") or [])
     actual_symbols = _symbols(market_rows)
     surfaced_symbols = _symbols(shortlist)
 
@@ -230,6 +235,12 @@ def build_trading_dashboard(
             "rejection_reasons": dict(sorted(reasons.items())),
             "failure_taxonomy": {
                 code: taxonomy.get(code, 0) for code in sorted(FAILURE_CODES)
+            },
+            "missed_green_audit": {
+                "state": "VERIFIED_ARTIFACT" if audit_rows or audit_counts else "MISSING",
+                "counts": audit_counts,
+                "rows": audit_rows,
+                "threshold_changes_auto_applied": False,
             },
         },
         "agent_roles": roles,

@@ -1,5 +1,5 @@
 {
-  "version": "0.11",
+  "version": "0.12",
   "release_name": "webui-control-plane-foundation",
   "release_state": "STAGED_NOT_DEPLOYED",
   "live_effect": false,
@@ -84,6 +84,11 @@
       "id": "trading-dashboard-evidence",
       "config": "webui-control/t212-agent-bindings.json",
       "code": "openwebui/tools/trading_dashboard_evidence.py"
+    },
+    {
+      "id": "trading-dashboard-builder",
+      "config": "webui-control/t212-agent-bindings.json",
+      "code": "scripts/build_trading_dashboard.py"
     },
     {
       "id": "t212-implementation-map",
@@ -215,7 +220,8 @@
     "forbid_secrets_in_repository": true,
     "require_runtime_evidence_for_proven_status": true,
     "workspace_isolation_command": "python scripts/audit_workspace_isolation.py",
-    "demo_validation_status_command": "python scripts/build_demo_validation_status.py --ledger /var/lib/t212-scanner/demo_validation.jsonl"
+    "demo_validation_status_command": "python scripts/build_demo_validation_status.py --ledger /var/lib/t212-scanner/demo_validation.jsonl",
+    "trading_dashboard_command": "python scripts/build_trading_dashboard.py --state-dir /var/lib/t212-scanner --output /var/lib/t212-scanner/trading_dashboard_latest.json --ledger /var/lib/t212-scanner/automation_runs.jsonl --require-complete"
   },
   "trading_safety": {
     "environment": "DEMO",
