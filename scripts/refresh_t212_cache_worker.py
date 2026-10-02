@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,6 +74,30 @@ def fingerprint(instruments) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def _retry_delay(headers, attempt: int) -> float:
+    """Deterministic bounded delay for read-only metadata retries."""
+    retry_after = headers.get("Retry-After") if headers else None
+    try:
+        return min(max(float(retry_after), 0.5), 15.0)
+    except (TypeError, ValueError):
+        schedule = (1.0, 2.0, 4.0)
+        return schedule[min(max(int(attempt), 0), len(schedule) - 1)]
+
+
+def fetch_instruments(req, *, timeout: int = 30, max_attempts: int = 4):
+    """Fetch the DEMO instrument master with bounded 429/5xx retries."""
+    for attempt in range(max(1, int(max_attempts))):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            retryable = exc.code == 429 or 500 <= exc.code < 600
+            if not retryable or attempt + 1 >= max_attempts:
+                raise
+            time.sleep(_retry_delay(exc.headers, attempt))
+    raise RuntimeError("T212 DEMO metadata fetch exhausted retries")
+
+
 def main() -> int:
     started = datetime.now(timezone.utc)
     key = os.getenv("T212_DEMO_API_KEY", "").strip()
@@ -102,17 +127,37 @@ def main() -> int:
             headers={"Authorization": f"Basic {token}", "Accept": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                current = json.loads(response.read().decode("utf-8"))
+            current = fetch_instruments(req, timeout=30, max_attempts=4)
         except Exception as exc:
+            if previous:
+                fetched_epoch = float(previous_payload.get("fetchedAtEpoch") or 0)
+                status = {
+                    "ok": False,
+                    "degraded": True,
+                    "environment": "DEMO",
+                    "started_at": started.isoformat(),
+                    "finished_at": datetime.now(timezone.utc).isoformat(),
+                    "error_code": "T212_DEMO_METADATA_FETCH_FAILED",
+                    "error_type": type(exc).__name__,
+                    "cache_source": "stale-disk-fallback",
+                    "cache_age_seconds": max(0.0, time.time() - fetched_epoch),
+                    "instrument_count": len(previous),
+                    "orders_submitted": 0,
+                    "live_trading_enabled": False,
+                }
+                atomic(STATUS, status)
+                print(json.dumps(status, sort_keys=True))
+                return 0
             atomic(STATUS, {
                 "ok": False,
+                "degraded": False,
                 "environment": "DEMO",
                 "started_at": started.isoformat(),
                 "finished_at": datetime.now(timezone.utc).isoformat(),
                 "error_code": "T212_DEMO_METADATA_FETCH_FAILED",
                 "error_type": type(exc).__name__,
                 "orders_submitted": 0,
+                "live_trading_enabled": False,
             })
             raise
 
@@ -156,3 +201,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

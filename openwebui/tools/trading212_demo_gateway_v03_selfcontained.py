@@ -9,9 +9,14 @@ import os
 import json
 import time
 import asyncio
-import random
+from contextlib import contextmanager
 from pathlib import Path
 import httpx
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - runtime is Linux
+    fcntl = None
 
 
 class InstrumentCache:
@@ -24,6 +29,21 @@ class InstrumentCache:
         self.cache_path = Path(cache_path)
         self.diff_path = Path(diff_path)
         self.ttl_seconds = int(ttl_seconds)
+        self.lock_path = self.cache_path.with_suffix(".lock")
+
+    @contextmanager
+    def lock(self):
+        """Serialise refreshes across Open WebUI workers and the host cache worker."""
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = self.lock_path.open("a+")
+        try:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
 
     def load(self):
         if not self.cache_path.exists():
@@ -49,6 +69,7 @@ class InstrumentCache:
         path.parent.mkdir(parents=True, exist_ok=True)
         temp = path.with_suffix(path.suffix + ".tmp")
         temp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+        os.chmod(temp, 0o600)
         temp.replace(path)
 
     def diff(self, previous, current):
@@ -133,7 +154,19 @@ class Tools:
         self.base_url = "https://demo.trading212.com/api/v0"
         self.last_submission = None
         self.last_submission_time = 0.0
-        self.instrument_cache = InstrumentCache()
+        self.instrument_cache = InstrumentCache(
+            cache_path=os.getenv(
+                "T212_INSTRUMENT_CACHE_PATH",
+                "/app/backend/data/t212-scanner/t212_instrument_cache.json",
+            ),
+            diff_path=os.getenv(
+                "T212_INSTRUMENT_DIFF_PATH",
+                "/app/backend/data/t212-scanner/t212_instrument_diff.json",
+            ),
+            ttl_seconds=int(os.getenv("T212_INSTRUMENT_CACHE_TTL_SECONDS", "86400")),
+        )
+        self._cache_lock = asyncio.Lock()
+        self._metadata_fetch_count = 0
 
     def _credentials(self):
         return (
@@ -146,6 +179,18 @@ class Tools:
             return value
         return json.dumps(value, indent=2, default=str)
 
+    @staticmethod
+    def _retry_delay(response, attempt):
+        """Return a deterministic bounded GET retry delay in seconds."""
+        if response is not None:
+            retry_after = response.headers.get("Retry-After")
+            try:
+                return min(max(float(retry_after), 0.5), 15.0)
+            except (TypeError, ValueError):
+                pass
+        schedule = (1.0, 2.0, 4.0)
+        return schedule[min(max(int(attempt), 0), len(schedule) - 1)]
+
     async def _request(self, method, path, json_body=None):
         key, secret = self._credentials()
 
@@ -154,9 +199,9 @@ class Tools:
 
         method = method.upper()
         max_attempts = 4 if method == "GET" else 1
-        delay = 1.0
-
         for attempt in range(max_attempts):
+            if method == "GET" and path == "/equity/metadata/instruments":
+                self._metadata_fetch_count += 1
             try:
                 async with httpx.AsyncClient(
                     timeout=30.0,
@@ -178,18 +223,11 @@ class Tools:
                     data = response.text
 
                 if method == "GET" and response.status_code == 429 and attempt + 1 < max_attempts:
-                    retry_after = response.headers.get("Retry-After")
-                    try:
-                        wait = float(retry_after)
-                    except Exception:
-                        wait = delay + random.uniform(0, 0.25)
-                    await asyncio.sleep(min(max(wait, 0.5), 15.0))
-                    delay = min(delay * 2.0, 15.0)
+                    await asyncio.sleep(self._retry_delay(response, attempt))
                     continue
 
                 if method == "GET" and 500 <= response.status_code < 600 and attempt + 1 < max_attempts:
-                    await asyncio.sleep(delay + random.uniform(0, 0.25))
-                    delay = min(delay * 2.0, 15.0)
+                    await asyncio.sleep(self._retry_delay(response, attempt))
                     continue
 
                 if response.is_error:
@@ -199,28 +237,35 @@ class Tools:
 
             except Exception as exc:
                 if method == "GET" and attempt + 1 < max_attempts:
-                    await asyncio.sleep(delay)
-                    delay = min(delay * 2.0, 15.0)
+                    await asyncio.sleep(self._retry_delay(None, attempt))
                     continue
                 return None, f"T212 DEMO connection error: {type(exc).__name__}: {exc}"
 
         return None, "T212 DEMO request failed."
 
     async def _ensure_instrument_cache(self, force=False):
-        payload = self.instrument_cache.load()
-        if payload and self.instrument_cache.is_fresh(payload) and not force:
-            return payload["instruments"], None, "disk"
+        # The asyncio lock prevents same-process coroutines from blocking the event
+        # loop on flock while another coroutine awaits the metadata response.
+        async with self._cache_lock:
+            with self.instrument_cache.lock():
+                # Re-read after taking both locks; another process may have refreshed.
+                payload = self.instrument_cache.load()
+                if payload and self.instrument_cache.is_fresh(payload) and not force:
+                    return payload["instruments"], None, "disk"
 
-        previous = payload.get("instruments", []) if payload else []
-        data, error = await self._request("GET", "/equity/metadata/instruments")
-        if error:
-            if previous:
-                return previous, None, "stale-disk-fallback"
-            return None, error, None
-
-        instruments = data if isinstance(data, list) else []
-        self.instrument_cache.save_snapshot(instruments, previous)
-        return instruments, None, "api-refresh"
+                previous = payload.get("instruments", []) if payload else []
+                data, error = await self._request("GET", "/equity/metadata/instruments")
+                if error:
+                    if previous:
+                        return previous, None, "stale-disk-fallback"
+                    return None, error, None
+                instruments = data if isinstance(data, list) else []
+                if not instruments:
+                    if previous:
+                        return previous, None, "stale-disk-fallback"
+                    return None, "T212 DEMO instrument metadata was empty.", None
+                self.instrument_cache.save_snapshot(instruments, previous)
+                return instruments, None, "api-refresh"
 
     async def refresh_instrument_cache(self, force: bool = False) -> str:
         """
@@ -254,8 +299,10 @@ class Tools:
             "gatewayVersion": "0.3.0-candidate",
             "cacheExists": bool(payload),
             "cacheFresh": self.instrument_cache.is_fresh(payload),
+            "cachePath": str(self.instrument_cache.cache_path),
             "instrumentCount": len((payload or {}).get("instruments", [])),
             "fetchedAtEpoch": (payload or {}).get("fetchedAtEpoch"),
+            "metadataFetchesThisProcess": self._metadata_fetch_count,
             "liveTradingEnabled": False,
         })
 

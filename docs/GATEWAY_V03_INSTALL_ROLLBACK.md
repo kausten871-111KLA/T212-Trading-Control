@@ -33,3 +33,50 @@ If any smoke test fails:
 2. Do not retry broker POST actions.
 3. If configuration state is damaged, restore the SQLite online backup.
 4. Re-run DEMO-only dashboard reconciliation.
+
+
+## Shared-cache deployment contract
+
+The host worker and the Open WebUI gateway must use the same underlying directory:
+
+- host: `/var/lib/t212-scanner`
+- container: `/app/backend/data/t212-scanner`
+- cache: `t212_instrument_cache.json`
+- diff: `t212_instrument_diff.json`
+- refresh lock: `t212_instrument_cache.lock`
+
+Required container environment:
+
+```text
+T212_INSTRUMENT_CACHE_PATH=/app/backend/data/t212-scanner/t212_instrument_cache.json
+T212_INSTRUMENT_DIFF_PATH=/app/backend/data/t212-scanner/t212_instrument_diff.json
+T212_INSTRUMENT_CACHE_TTL_SECONDS=86400
+```
+
+The host directory must be bind-mounted read/write at the container directory above. Do not guess or recreate the container until its existing compose/run configuration and rollback anchor are identified.
+
+Read-only mount inspection:
+
+```bash
+docker inspect open-webui --format '{{range .Mounts}}{{println .Source "->" .Destination}}{{end}}'
+```
+
+Success requires an exact `/var/lib/t212-scanner -> /app/backend/data/t212-scanner` mapping. If absent, status is **BLOCKED_NOT_SHARED**; do not install the gateway candidate yet.
+
+## Candidate acceptance
+
+From the exact reviewed checkout, before replacing the live tool:
+
+```bash
+python -m unittest -v tests.test_gateway_cache_acceptance tests.test_cache_worker_acceptance
+python scripts/test_gateway_v03_readonly.py openwebui/tools/trading212_demo_gateway_v03_selfcontained.py
+```
+
+The live read-only test must report:
+
+- `GATEWAY_V03_DEMO_TEST=PASS`
+- `TEN_LOOKUPS_METADATA_REDOWNLOADS=0`
+- `LIVE_TRADING_ENABLED=False`
+- `ORDERS_SUBMITTED=0`
+
+A stale cache may be used only as an explicitly labelled `stale-disk-fallback`; freshness-dependent discovery must continue to fail closed.

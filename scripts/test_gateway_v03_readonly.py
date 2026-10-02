@@ -24,8 +24,12 @@ async def main():
         assert first["diffSummary"]["addedCount"]==0
         status=json.loads(await tool.instrument_cache_status())
         assert status["cacheExists"] and status["cacheFresh"]
-        search=json.loads(await tool.find_instrument("Apple"))
-        assert isinstance(search,list) and len(search)>=1
+        fetches_before=status["metadataFetchesThisProcess"]
+        searches=[json.loads(await tool.find_instrument("Apple")) for _ in range(10)]
+        assert all(isinstance(search,list) and len(search)>=1 for search in searches)
+        status_after=json.loads(await tool.instrument_cache_status())
+        assert status_after["metadataFetchesThisProcess"]==fetches_before
+        search=searches[0]
         new=json.loads(await tool.new_on_t212())
         assert new["newCount"]==0
         second=json.loads(await tool.refresh_instrument_cache(force=False))
@@ -33,6 +37,7 @@ async def main():
         print("GATEWAY_V03_DEMO_TEST=PASS")
         print("INSTRUMENT_COUNT="+str(first["instrumentCount"]))
         print("SEARCH_MATCHES="+str(len(search)))
+        print("TEN_LOOKUPS_METADATA_REDOWNLOADS=0")
         print("CACHE_SOURCE_SECOND="+second["cacheSource"])
         print("LIVE_TRADING_ENABLED=False")
         print("ORDERS_SUBMITTED=0")

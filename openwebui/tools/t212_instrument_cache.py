@@ -20,14 +20,14 @@ except ImportError:
 class InstrumentCache:
     def __init__(
         self,
-        cache_path: str = "/app/backend/data/t212_instrument_cache.json",
-        diff_path: str = "/app/backend/data/t212_instrument_diff.json",
+        cache_path: str = "/app/backend/data/t212-scanner/t212_instrument_cache.json",
+        diff_path: str = "/app/backend/data/t212-scanner/t212_instrument_diff.json",
         ttl_seconds: int = 86400,
     ):
         self.cache_path = Path(cache_path)
         self.diff_path = Path(diff_path)
         self.ttl_seconds = int(ttl_seconds)
-        self.lock_path = self.cache_path.with_suffix(self.cache_path.suffix + ".lock")
+        self.lock_path = self.cache_path.with_suffix(".lock")
 
     @contextmanager
     def lock(self):
@@ -66,6 +66,7 @@ class InstrumentCache:
         path.parent.mkdir(parents=True, exist_ok=True)
         temp = path.with_suffix(path.suffix + ".tmp")
         temp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+        temp.chmod(0o600)
         temp.replace(path)
 
     def diff(

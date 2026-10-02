@@ -82,3 +82,32 @@ Tracked metadata:
 - No keys are written to cache files.
 - No execution behaviour changes until gateway integration is separately reviewed.
 - Do not merge/deploy without checking current installed WebUI tool source against repo source.
+
+
+## Canonical shared path and lock
+
+The gateway and host refresh worker now coordinate through one underlying bind-mounted directory.
+
+| Runtime | Directory |
+|---|---|
+| Host worker | `/var/lib/t212-scanner` |
+| Open WebUI container | `/app/backend/data/t212-scanner` |
+
+Both sides use the same filenames and the same `t212_instrument_cache.lock`. The gateway re-reads the cache after acquiring its in-process and file locks, preventing concurrent refreshes from redownloading the metadata master.
+
+The gateway performs deterministic bounded GET retries: 1s, 2s and 4s unless a valid broker `Retry-After` header is supplied (clamped to 0.5–15s). Broker POST requests are never retried.
+
+If refresh still fails and a prior cache exists, the gateway/worker preserve it and label the source `stale-disk-fallback`. They do not silently mark stale data fresh. Downstream freshness gates remain authoritative.
+
+## Branch-side acceptance evidence
+
+The offline acceptance suite proves:
+
+1. ten sequential fresh-cache lookups make one metadata fetch total;
+2. ten concurrent lookups share one refresh;
+3. no POST/order path is called;
+4. cached data survives a provider 429;
+5. retry timing is deterministic and bounded;
+6. cache files are private (`0600`).
+
+This is source-code evidence only. Runtime mount, credentials, live tool source and container behavior remain unverified until the controlled installation runbook passes.
