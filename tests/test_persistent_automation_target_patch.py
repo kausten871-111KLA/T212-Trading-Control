@@ -1,10 +1,11 @@
+import os
 """Pure staged-patch checks; no database, provider, broker, or live WebUI writes."""
 import ast
 import pathlib
 import unittest
 ROOT = pathlib.Path(__file__).parents[1]
-MODEL = ROOT / "patches/openwebui-v0.11.3/open_webui/models/automations.py"
-UTILS = ROOT / "patches/openwebui-v0.11.3/open_webui/utils/automations.py"
+MODEL = ROOT / f"patches/openwebui-{os.environ.get('WEBUI_PATCH_VERSION','v0.11.3')}/open_webui/models/automations.py"
+UTILS = ROOT / f"patches/openwebui-{os.environ.get('WEBUI_PATCH_VERSION','v0.11.3')}/open_webui/utils/automations.py"
 def load_helper():
     tree = ast.parse(UTILS.read_text())
     fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_bounded_chat_context")

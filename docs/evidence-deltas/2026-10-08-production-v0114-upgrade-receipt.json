@@ -1,0 +1,52 @@
+{
+  "status": "DEPLOYED_AND_VERIFIED",
+  "at": "2026-10-08T22:19:36.417279+00:00",
+  "version": "0.11.4",
+  "image_digest": "ghcr.io/open-webui/open-webui@sha256:9591b13f13843c7721c2b8eaf7382846c81b3ffe126526d1888d1fed50c6a33f",
+  "docker_health": "healthy",
+  "cold_full_volume_backup": true,
+  "rollback_image_id": "sha256:41daa0cf2561a5d4c8d1ff31ee2a98d93ab4d3ac2605cac69366ff6a3374a933",
+  "migration_head_unchanged": true,
+  "preserved_tables": [
+    "chat",
+    "tool",
+    "function",
+    "model",
+    "user",
+    "auth",
+    "prompt",
+    "knowledge",
+    "file",
+    "folder",
+    "config (existing values preserved; new defaults allowed)"
+  ],
+  "preexisting_chats_preserved": 110,
+  "active_automations": 3,
+  "automation_config_and_run_state_preserved": true,
+  "configured_environment_preserved": true,
+  "loopback_port_preserved": true,
+  "cloudflared_state": "active",
+  "custom_patch_deployed": false,
+  "smoke": {
+    "authenticated_endpoints": {
+      "/api/v1/auths/": 200,
+      "/api/v1/tools/": 200,
+      "/api/v1/models": 200,
+      "/api/v1/functions/": 200,
+      "/api/tasks": 200
+    },
+    "authenticated_history_equal": true,
+    "background_task_count": 0
+  },
+  "restore_rehearsal": {
+    "full_volume_restore_rehearsal": "PASS",
+    "restored_sqlite_integrity": "ok",
+    "restored_core_tables_equal": true,
+    "restored_container_started": false
+  },
+  "four_application_files_match_official_v0114": true,
+  "original_configuration_keys_preserved": 345,
+  "additional_upstream_default_configuration_keys": 7,
+  "docker_and_cloudflared_boot_enabled": true,
+  "scope": "Official standard image upgrade only; draft persistent-chat patch remains undeployed."
+}

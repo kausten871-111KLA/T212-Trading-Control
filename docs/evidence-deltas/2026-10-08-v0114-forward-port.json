@@ -1,0 +1,24 @@
+{
+  "tag": "v0.11.4",
+  "status": "STAGED_SOURCE_ONLY",
+  "files": {
+    "models/automations.py": {
+      "upstream_sha256": "628b4f0939474e6c9e7489f630a648b90d4fba20bca089165c0302aa60006cdd",
+      "candidate_sha256": "a6af0ac557719fbe242546a770b0dc8db4a7f608fb84d07bb1c8ee26ec9c953b"
+    },
+    "routers/automations.py": {
+      "upstream_sha256": "c0d5d04f59ebec0560d9d5950325c4bbbdfee3845620031b4e4a951c496a1a09",
+      "candidate_sha256": "8fbd9fb3d34057d61c819e3244b69bdea343cfb7b8a5cfd7091783bdbc1566e3"
+    },
+    "utils/automations.py": {
+      "upstream_sha256": "0f1d962ba85496497d957d55de60d4530aa8cc9a724a597c2cb62975889d19fd",
+      "candidate_sha256": "15bb40ad7e510059a3e37d996e1984800b5de2cd35c3eb7dcf6cf386988824c4"
+    },
+    "utils/middleware.py": {
+      "upstream_sha256": "bda81a45b4169ec2af351c3eed7a574b0e43cf1026c3d6945dada7290a5af497",
+      "candidate_sha256": "1fcc3f6aa17fd8ddb747a4f14c37a917f8c6410684ebac2e28e80ccc275b3c80"
+    }
+  },
+  "upstream_v4_model_defaults_preserved": true,
+  "middleware_custom_hunks": 5
+}
