@@ -12,7 +12,7 @@ parser.add_argument("--match",default=None)
 args=parser.parse_args()
 if not args.container.startswith("open-webui-handler-it-"):
     raise SystemExit("Explicit handler disposable container required")
-if args.base!="http://127.0.0.1:38081":
+if args.base not in ("http://127.0.0.1:38081","http://127.0.0.1:38083"):
     raise SystemExit("Explicit candidate loopback endpoint required")
 data=Path(args.data_dir).resolve()
 if not data.name.startswith("webui-handler-integration-"):

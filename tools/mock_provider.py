@@ -10,6 +10,8 @@ class State:
         self.lock = threading.Lock()
         self.fail = False
         self.delay = 0
+        self.prefix = "IT_RUN_"
+        self.partial = False
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args): pass
@@ -30,20 +32,22 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/control":
             self.server.state.fail = bool(data.get("fail"))
             self.server.state.delay = float(data.get("delay",0))
+            self.server.state.prefix = data.get("prefix","IT_RUN_")
+            self.server.state.partial = bool(data.get("partial"))
             self.json_reply({"fail":self.server.state.fail}); return
         if self.path != "/v1/chat/completions":
             self.json_reply({"error":"not found"},404); return
         state = self.server.state
         with state.lock:
             # Synthetic test messages only; never record headers, keys or arbitrary payload fields.
-            record = {"model":data.get("model"),"messages":data.get("messages",[]),"stream":data.get("stream")}
+            record = {"observed_at_ns":time.time_ns(),"model":data.get("model"),"messages":data.get("messages",[]),"stream":data.get("stream")}
             state.requests.append(record)
             number = len(state.requests)
             state.capture.write_text(json.dumps(state.requests,indent=2))
         if state.delay: time.sleep(state.delay)
         if state.fail:
             self.json_reply({"error":{"message":"deliberate IT provider failure","type":"test_error"}},500); return
-        text = "IT_RUN_" + str(number)
+        text = state.prefix + str(number)
         common = {"id":"it-"+str(number),"object":"chat.completion.chunk","created":int(time.time()),"model":"it-mock"}
         if not data.get("stream"):
             self.json_reply({**common,"object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":text},"finish_reason":"stop"}]}); return
@@ -52,10 +56,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control","no-cache")
         self.send_header("Connection","close")
         self.end_headers()
-        for delta,finish in [({"role":"assistant"},None),({"content":text},None),({},"stop")]:
+        chunks=[({"role":"assistant"},None),({"content":text},None)]
+        if not state.partial:chunks.append(({},"stop"))
+        for delta,finish in chunks:
             chunk={**common,"choices":[{"index":0,"delta":delta,"finish_reason":finish}]}
             self.wfile.write(("data: "+json.dumps(chunk)+"\n\n").encode());self.wfile.flush()
-        self.wfile.write(b"data: [DONE]\n\n");self.wfile.flush()
+        if not state.partial:
+            self.wfile.write(b"data: [DONE]\n\n");self.wfile.flush()
         self.close_connection=True
 
 def serve(port,capture):

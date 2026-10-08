@@ -1,3 +1,4 @@
+import os
 """Disposable create/update ownership contract tests for the staged v0.11.3 router."""
 import ast
 import asyncio
@@ -6,7 +7,7 @@ import types
 import unittest
 
 ROOT=pathlib.Path(__file__).parents[1]
-ROUTER=ROOT/"patches/openwebui-v0.11.3/open_webui/routers/automations.py"
+ROUTER=ROOT/f"patches/openwebui-{os.environ.get('WEBUI_PATCH_VERSION','v0.11.3')}/open_webui/routers/automations.py"
 
 tree=ast.parse(ROUTER.read_text())
 fn=next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name=="check_automation_chat_access")

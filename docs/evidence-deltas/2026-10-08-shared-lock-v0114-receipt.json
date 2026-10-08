@@ -1,0 +1,45 @@
+{
+  "at": "2026-10-08T22:01:46.378575+00:00",
+  "status": "DISPOSABLE_ACCEPTANCE_PASS_NOT_DEPLOYED",
+  "v0113_real_handler_tests_passed": 8,
+  "v0114_real_handler_tests_passed": 8,
+  "v0114_source_contract_checks_passed": 15,
+  "independent_process_lock_tests_passed": 4,
+  "v0114_image_digest": "sha256:9591b13f13843c7721c2b8eaf7382846c81b3ffe126526d1888d1fed50c6a33f",
+  "restart": {
+    "status": "PASS",
+    "at": "2026-10-08T21:59:30Z",
+    "version": {
+      "version": "0.11.4",
+      "deployment_id": ""
+    },
+    "authenticated_history_equal_after_restart": true,
+    "sqlite_backup_restore_integrity": "ok",
+    "restored_history_equal": true,
+    "all_automations_inactive": true
+  },
+  "upgrade_data": {
+    "pre_migration_head": "d4c1a8e37b62",
+    "post_migration_head": "d4c1a8e37b62",
+    "preexisting_chat_histories_preserved": 31,
+    "all_preexisting_histories_equal": true,
+    "all_automations_inactive": true
+  },
+  "multi_worker": {
+    "status": "PASS",
+    "two_linux_workers_same_shared_data": true,
+    "second_run_context_included_first_reply": true,
+    "persisted_replies": 2,
+    "coherent_history": true
+  },
+  "rollback": {
+    "status": "PASS",
+    "at": "2026-10-08T22:01:31Z",
+    "rollback_version": "0.11.3",
+    "pinned_image_id": "sha256:41daa0cf2561a5d4c8d1ff31ee2a98d93ab4d3ac2605cac69366ff6a3374a933",
+    "restored_pre_migration_database": true,
+    "authenticated_history_equal": true,
+    "sqlite_integrity": "ok",
+    "production_touched": false
+  }
+}

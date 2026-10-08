@@ -14,7 +14,7 @@ def require_loopback(url):
     parsed=urlparse(url)
     if parsed.hostname!="127.0.0.1": raise ValueError("Disposable loopback endpoint required")
 require_loopback(BASE);require_loopback(MOCK)
-if urlparse(BASE).port not in (38080,38081): raise ValueError("Explicit disposable port 38080/38081 required")
+if urlparse(BASE).port not in (38080,38081,38083): raise ValueError("Explicit disposable port 38080/38081/38083 required")
 
 def api(path,data=None,method=None,base=BASE,token=None):
     body=json.dumps(data).encode() if data is not None else None

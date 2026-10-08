@@ -125,4 +125,13 @@ class ResilienceAcceptance(unittest.TestCase):
         self.assertTrue(any(m.get("content")=="IT_SEED" for m in request["messages"]))
         self.record("manual_default_replay",{"seed_replayed":True,"done":True})
 
+    def test_partial_stream_is_not_reported_success(self):
+        cid,aid=self.fixture()
+        self.control(partial=True)
+        api("/api/v1/automations/"+aid+"/run",{},token=self.token)
+        runs=self.wait_runs(aid,1)
+        history=api("/api/v1/chats/"+cid,token=self.token)["chat"]["history"]
+        self.record("partial_stream",{"runs":runs,"history":history})
+        self.assertNotEqual(runs[0]["status"],"success","Truncated SSE stream without finish/DONE was recorded as success")
+
 if __name__=="__main__":unittest.main()

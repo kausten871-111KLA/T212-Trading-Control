@@ -3,11 +3,14 @@ import argparse, json, os, sqlite3, subprocess, time
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-container="open-webui-handler-it-20261008"
-base="http://127.0.0.1:38081"
 parser=argparse.ArgumentParser()
 parser.add_argument("--data-dir",required=True)
+parser.add_argument("--container",default="open-webui-handler-it-20261008")
+parser.add_argument("--base",default="http://127.0.0.1:38081")
 args=parser.parse_args()
+container=args.container;base=args.base
+assert container.startswith("open-webui-handler-it-")
+assert base in ("http://127.0.0.1:38081","http://127.0.0.1:38083")
 data=Path(args.data_dir).resolve()
 assert data.name.startswith("webui-handler-integration-")
 receipt=json.loads((data/"two-run-acceptance-result.json").read_text())
