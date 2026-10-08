@@ -20,6 +20,7 @@ import logging
 import os
 import random
 import time
+import weakref
 from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
@@ -531,7 +532,43 @@ def _bounded_chat_context(chat_data: dict | None, limit: int = 12) -> list[dict]
     return branch[-limit:]
 
 
+# Serialize bound-chat automation executions within this WebUI process.
+# This does not provide a distributed lease or durable replay idempotency.
+_PERSISTENT_CHAT_LOCKS = weakref.WeakValueDictionary()
+
+
+async def _wait_for_automation_completion(chat_id: str, message_id: str) -> None:
+    # Handler return acknowledges a background task, not streamed persistence.
+    timeout = max(1, int(os.getenv('AUTOMATION_COMPLETION_TIMEOUT_SECONDS', '300')))
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        message = await Chats.get_message_by_id_and_message_id(chat_id, message_id)
+        if isinstance(message, dict):
+            if message.get('error'):
+                error = message['error']
+                detail = error.get('content', str(error)) if isinstance(error, dict) else str(error)
+                raise RuntimeError('Automation completion failed: ' + detail[:2000])
+            if message.get('done') is True:
+                return
+        await asyncio.sleep(0.1)
+    raise TimeoutError('Automation completion was not persisted before timeout')
+
+
 async def execute_automation(app, automation: AutomationModel) -> None:
+    target = automation.data.get('target') or {}
+    chat_id = target.get('chat_id') if target.get('type', 'chat') == 'chat' else None
+    if not chat_id:
+        await _execute_automation(app, automation)
+        return
+    lock = _PERSISTENT_CHAT_LOCKS.get(chat_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _PERSISTENT_CHAT_LOCKS[chat_id] = lock
+    async with lock:
+        await _execute_automation(app, automation)
+
+
+async def _execute_automation(app, automation: AutomationModel) -> None:
     """Execute an automation through the full chat completion pipeline.
 
     Creates a real chat or channel message, then calls chat_completion exactly like the frontend:
@@ -735,7 +772,18 @@ async def execute_automation(app, automation: AutomationModel) -> None:
         # Call the full chat completion pipeline (same as POST /api/chat/completions).
         # The handler reference is stored on app.state to avoid circular imports.
         request = _build_request(app, token=token)
-        await app.state.CHAT_COMPLETION_HANDLER(request, form_data, user=user)
+        request.state.automation_bounded_context = bool(target_chat_id)
+        completion = await app.state.CHAT_COMPLETION_HANDLER(request, form_data, user=user)
+        try:
+            await _wait_for_automation_completion(chat.id, assistant_msg_id)
+        except BaseException:
+            # Cancel only tasks created by this execution. Do not cancel unrelated
+            # manual activity in the same chat when a completion times out.
+            from open_webui.tasks import stop_task
+
+            for task_id in (completion or {}).get('task_ids', []) if isinstance(completion, dict) else []:
+                await stop_task(app.state.redis, task_id)
+            raise
 
         # Notify user
         from open_webui.socket.main import sio

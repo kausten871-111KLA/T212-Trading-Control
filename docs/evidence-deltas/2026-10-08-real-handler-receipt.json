@@ -1,0 +1,60 @@
+{
+  "version": "0.11.3",
+  "base_commit": "ca848d658d2471c64058508b8a3f0244af366f30",
+  "production_deployed": false,
+  "two-run-acceptance-result.json": {
+    "started_at": "2026-10-08T21:24:26Z",
+    "status": "PASS_TWO_RUN",
+    "checks": {
+      "run_1_persisted": true,
+      "run_2_persisted": true,
+      "same_chat_and_tree": true,
+      "prior_reply_in_bounded_context": true,
+      "api_reload": true
+    },
+    "config_restored": true,
+    "finished_at": "2026-10-08T21:24:27Z"
+  },
+  "resilience-acceptance-result.json": {
+    "deleted_target": {
+      "at": "2026-10-08T21:24:28Z",
+      "mock_calls": 0
+    },
+    "overlap": {
+      "at": "2026-10-08T21:24:31Z",
+      "second_has_first_reply": true
+    },
+    "provider_failure": {
+      "at": "2026-10-08T21:24:34Z",
+      "mock_calls": 1
+    },
+    "oversized_context": {
+      "at": "2026-10-08T21:24:32Z",
+      "prior_messages": 32,
+      "prior_chars": 32000,
+      "stored_messages": 72
+    },
+    "timeout": {
+      "at": "2026-10-08T21:25:05Z"
+    },
+    "manual_default_replay": {
+      "at": "2026-10-08T21:26:30Z",
+      "seed_replayed": true,
+      "done": true
+    }
+  },
+  "restart-acceptance-result.json": {
+    "status": "PASS",
+    "at": "2026-10-08T21:26:04Z",
+    "authenticated_history_equal_after_restart": true,
+    "sqlite_backup_restore_integrity": "ok",
+    "restored_history_equal": true,
+    "all_automations_inactive": true
+  },
+  "candidate_source_sha256": {
+    "models/automations.py": "2ed39a6af9cac18e391cf487505f098517a841482fc4c03307f7dae4e4524f48",
+    "routers/automations.py": "9ab0856c19e1689bfdcc38ff48a780714bf4b55bf3af8ad96a3500b368411325",
+    "utils/automations.py": "4286e9ae5975603234bf00ff358f7111f78b3c0080020b88960c4876a7d5c3f6",
+    "utils/middleware.py": "25cd51dd420cc3e270a747807022a9adb4f4d72ba47ceaf2263f613f522aaede"
+  }
+}
