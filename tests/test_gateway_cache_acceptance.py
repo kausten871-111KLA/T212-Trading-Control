@@ -64,7 +64,7 @@ class GatewayCacheAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             tool._request = fake_request
             results = [
                 json.loads(await tool.find_instrument("Acme"))
-                for _ in range(10)
+                for _ in range(50)
             ]
 
             metadata = [
@@ -95,6 +95,18 @@ class GatewayCacheAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(*(tool.find_instrument("ABC") for _ in range(10)))
             self.assertEqual(calls, 1)
 
+    async def test_independent_tool_instances_share_refresh_without_deadlocking(self):
+        calls = []
+        async def request(method, path, json_body=None):
+            calls.append((method, path))
+            await asyncio.sleep(0.03)
+            return [{"ticker":"ABC_US_EQ","name":"ABC"}], None
+        with tempfile.TemporaryDirectory() as td:
+            tools = [self._tool(td) for _ in range(10)]
+            for tool in tools: tool._request = request
+            await asyncio.wait_for(asyncio.gather(*(tool.find_instrument('ABC') for tool in tools)), 3)
+            self.assertEqual(len(calls), 1)
+
     async def test_stale_cache_is_used_after_bounded_provider_failure(self):
         instruments = [{"ticker": "SAFE_US_EQ", "name": "Safe Corp", "type": "STOCK"}]
 
@@ -113,13 +125,28 @@ class GatewayCacheAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result[0]["ticker"], "SAFE_US_EQ")
             self.assertEqual(result[0]["cacheSource"], "stale-disk-fallback")
 
+    async def test_exact_ticker_currency_and_schedule_disambiguation(self):
+        with tempfile.TemporaryDirectory() as td:
+            tool=self._tool(td)
+            tool.instrument_cache.save_snapshot([
+                {'ticker':'ACME_US_EQ','name':'Acme','currencyCode':'USD','workingScheduleId':1},
+                {'ticker':'ACME_GB_EQ','name':'Acme','currencyCode':'GBP','workingScheduleId':2}],[])
+            async def forbidden(*args,**kwargs):raise AssertionError('Warm lookup made network request')
+            tool._request=forbidden
+            broad=json.loads(await tool.find_instrument('Acme'))
+            self.assertTrue(all(row['selectionRequired'] for row in broad))
+            selected=json.loads(await tool.find_instrument('Acme',currency_code='GBP',working_schedule_id=2))
+            self.assertEqual([r['ticker'] for r in selected],['ACME_GB_EQ'])
+            exact=json.loads(await tool.find_instrument('ACME_US_EQ'))
+            self.assertEqual([r['ticker'] for r in exact],['ACME_US_EQ'])
+
     def test_retry_schedule_is_deterministic_and_bounded(self):
         self.assertEqual(
             [GATEWAY.Tools._retry_delay(None, i) for i in range(4)],
             [1.0, 2.0, 4.0, 4.0],
         )
         self.assertEqual(GATEWAY.Tools._retry_delay(_Response("9"), 0), 9.0)
-        self.assertEqual(GATEWAY.Tools._retry_delay(_Response("99"), 0), 15.0)
+        self.assertEqual(GATEWAY.Tools._retry_delay(_Response("99"), 0), 99.0)
         self.assertEqual(GATEWAY.Tools._retry_delay(_Response("bad"), 1), 2.0)
 
 

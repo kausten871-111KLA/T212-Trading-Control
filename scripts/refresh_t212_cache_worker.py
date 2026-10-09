@@ -8,6 +8,8 @@ import json
 import os
 import sys
 import time
+import math
+from email.utils import parsedate_to_datetime
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -78,10 +80,16 @@ def _retry_delay(headers, attempt: int) -> float:
     """Deterministic bounded delay for read-only metadata retries."""
     retry_after = headers.get("Retry-After") if headers else None
     try:
-        return min(max(float(retry_after), 0.5), 15.0)
+        wait = float(retry_after)
+        if math.isfinite(wait):
+            return max(wait, 0.5)
     except (TypeError, ValueError):
-        schedule = (1.0, 2.0, 4.0)
-        return schedule[min(max(int(attempt), 0), len(schedule) - 1)]
+        try:
+            return max(parsedate_to_datetime(retry_after).timestamp() - time.time(), 0.5)
+        except (TypeError, ValueError, OverflowError):
+            pass
+    schedule = (1.0, 2.0, 4.0)
+    return schedule[min(max(int(attempt), 0), len(schedule) - 1)]
 
 
 def fetch_instruments(req, *, timeout: int = 30, max_attempts: int = 4):
@@ -94,7 +102,12 @@ def fetch_instruments(req, *, timeout: int = 30, max_attempts: int = 4):
             retryable = exc.code == 429 or 500 <= exc.code < 600
             if not retryable or attempt + 1 >= max_attempts:
                 raise
-            time.sleep(_retry_delay(exc.headers, attempt))
+            wait = _retry_delay(exc.headers, attempt)
+            if exc.code == 429:
+                wait = max(wait, 50.0)
+            if wait > 180:
+                raise
+            time.sleep(wait)
     raise RuntimeError("T212 DEMO metadata fetch exhausted retries")
 
 
@@ -201,4 +214,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -60,11 +60,21 @@ class CacheWorkerAcceptanceTests(unittest.TestCase):
 
         self.assertEqual(result, [{"ticker": "ABC_US_EQ"}])
         self.assertEqual(len(attempts), 3)
-        self.assertEqual(sleeps, [1.0, 2.0])
+        self.assertEqual(sleeps, [50.0, 50.0])
 
-    def test_retry_after_is_clamped(self):
+    def test_long_provider_cooldown_aborts_without_early_retry(self):
+        calls=[]
+        def request(*args, **kwargs):
+            calls.append(1)
+            raise _http_error(429,'300')
+        with mock.patch.object(WORKER.urllib.request,'urlopen',side_effect=request):
+            with mock.patch.object(WORKER.time,'sleep') as sleep:
+                with self.assertRaises(urllib.error.HTTPError):WORKER.fetch_instruments(object())
+        self.assertEqual(len(calls),1);sleep.assert_not_called()
+
+    def test_retry_after_is_respected(self):
         self.assertEqual(WORKER._retry_delay({"Retry-After": "9"}, 0), 9.0)
-        self.assertEqual(WORKER._retry_delay({"Retry-After": "99"}, 0), 15.0)
+        self.assertEqual(WORKER._retry_delay({"Retry-After": "99"}, 0), 99.0)
         self.assertEqual(WORKER._retry_delay({}, 2), 4.0)
 
     def test_existing_cache_survives_provider_429_without_order_path(self):
