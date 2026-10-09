@@ -51,9 +51,19 @@ class SystemdReadinessTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             with self.subTest(service=path.name):
                 self.assertRegex(text, r"(?m)^TimeoutStartSec=\S+")
-                self.assertIn("Restart=on-failure", text)
-                self.assertRegex(text, r"(?m)^RestartSec=\S+")
+                if path.name == "t212-cache-refresh.service":
+                    self.assertIn("Restart=no", text)  # Timer owns cadence; no extra refresh loop.
+                else:
+                    self.assertIn("Restart=on-failure", text)
+                    self.assertRegex(text, r"(?m)^RestartSec=\S+")
                 self.assertIn("StartLimitBurst=3", text)
+
+    def test_cache_service_timeout_allows_provider_cooldown_budget(self):
+        text=self.read("t212-cache-refresh.service")
+        amount,unit=re.search(r"(?m)^TimeoutStartSec=(\d+)(s|min)$",text).groups()
+        seconds=int(amount)*(60 if unit=='min' else 1)
+        self.assertGreaterEqual(seconds,4*30+3*180+30)
+        self.assertIn('EnvironmentFile=/etc/t212/demo-cache.env',text)
 
     def test_all_worker_services_have_filesystem_hardening(self):
         required = (

@@ -132,7 +132,46 @@ class OrderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_legacy_market_fractional_operation_retained(self):
         value=json.loads(await self.tool().place_market_order('BUY','ACME_US_EQ',.1))
-        self.assertEqual(value['quantity'],.1);self.assertEqual(self.calls[-1][1],'/equity/orders/market')
+        self.assertEqual(value['quantity'],.1);self.assertEqual([c for c in self.calls if c[0]=='POST'][-1][1],'/equity/orders/market')
+
+    async def test_market_compatibility_key_blocks_restart_replay(self):
+        first=json.loads(await self.tool().place_market_order('BUY','ACME_US_EQ',.1))
+        second=json.loads(await self.tool().place_market_order('BUY','ACME_US_EQ',.1))
+        self.assertEqual(first['state'],'PENDING')
+        self.assertTrue(second['replayBlocked'])
+        self.assertEqual(sum(c[0]=='POST' for c in self.calls),1)
+
+    async def test_market_explicit_decisions_share_sell_reservations(self):
+        with mock.patch.object(G.OrderIntentJournal,'pace',new=mock.AsyncMock()):
+            first=json.loads(await self.tool().place_market_order('SELL','ACME_US_EQ',6,intent_id='market-sell'))
+            second=json.loads(await self.tool().place_limit_order('SELL','ACME_US_EQ',6,5,'pending-sell'))
+        self.assertEqual(first['state'],'PENDING');self.assertEqual(second['state'],'VALIDATION_FAILED')
+        self.assertEqual(sum(c[0]=='POST' for c in self.calls),1)
+
+    async def test_market_invalid_values_never_send(self):
+        for quantity in [None,True,float('nan'),float('inf'),0,-1]:
+            self.assertEqual(json.loads(await self.tool().place_market_order('BUY','ACME_US_EQ',quantity))['state'],'VALIDATION_FAILED')
+        self.assertEqual(json.loads(await self.tool().place_market_order('BUY','ACME_US_EQ',1,extended_hours='false'))['state'],'VALIDATION_FAILED')
+        self.assertEqual(self.calls,[])
+
+    async def test_close_position_uses_durable_market_intent(self):
+        first=json.loads(await self.tool().close_position('ACME_US_EQ','close-decision'))
+        second=json.loads(await self.tool().close_position('ACME_US_EQ','close-decision'))
+        self.assertEqual(first['quantity'],10)
+        self.assertTrue(second['replayBlocked'])
+        self.assertEqual(sum(c[0]=='POST' for c in self.calls),1)
+
+    async def test_already_terminal_cancel_readback_releases_reservation_without_delete(self):
+        t=self.tool()
+        with mock.patch.object(G.OrderIntentJournal,'pace',new=mock.AsyncMock()):
+            await t.place_stop_order('SELL','ACME_US_EQ',6,5,'original')
+            self.status='CANCELLED'
+            result=json.loads(await t.cancel_order(123,'already-cancelled'))
+            self.assertFalse(result['mutationAttempted'])
+            self.assertFalse(any(c[0]=='DELETE' for c in self.calls))
+            self.status='PENDING'
+            result=json.loads(await t.place_limit_order('SELL','ACME_US_EQ',6,5,'replacement'))
+        self.assertEqual(result['state'],'PENDING')
 
     async def test_confirmed_cancellation_releases_original_sell_reservation(self):
         t=self.tool()

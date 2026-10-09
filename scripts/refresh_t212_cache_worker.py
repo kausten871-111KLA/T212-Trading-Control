@@ -103,8 +103,7 @@ def fetch_instruments(req, *, timeout: int = 30, max_attempts: int = 4):
             if not retryable or attempt + 1 >= max_attempts:
                 raise
             wait = _retry_delay(exc.headers, attempt)
-            if exc.code == 429:
-                wait = max(wait, 50.0)
+            wait = max(wait, 50.0)  # Metadata budget also applies to retryable 5xx.
             if wait > 180:
                 raise
             time.sleep(wait)
@@ -133,6 +132,11 @@ def main() -> int:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         previous_payload = load(CACHE) or {}
         previous = previous_payload.get("instruments", [])
+        if previous and time.time() - float(previous_payload.get("fetchedAtEpoch") or 0) < 50:
+            status = {"ok": True, "environment": "DEMO", "cache_source": "disk-cooldown", "instrument_count": len(previous), "orders_submitted": 0, "live_trading_enabled": False}
+            atomic(STATUS, status)
+            print(json.dumps(status, sort_keys=True))
+            return 0
 
         token = base64.b64encode(f"{key}:{secret}".encode()).decode()
         req = urllib.request.Request(

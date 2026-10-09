@@ -334,7 +334,12 @@ class Tools:
                     continue
 
                 if method == "GET" and 500 <= response.status_code < 600 and attempt + 1 < max_attempts:
-                    await asyncio.sleep(self._retry_delay(response, attempt))
+                    wait = self._retry_delay(response, attempt)
+                    if path == "/equity/metadata/instruments":
+                        wait = max(wait, 50.0)
+                    if wait > 180:
+                        return None, "Provider cooldown exceeds retry budget; no early retry."
+                    await asyncio.sleep(wait)
                     continue
 
                 if response.is_error:
@@ -344,7 +349,7 @@ class Tools:
 
             except Exception as exc:
                 if method == "GET" and attempt + 1 < max_attempts:
-                    await asyncio.sleep(self._retry_delay(None, attempt))
+                    await asyncio.sleep(50.0 if path == "/equity/metadata/instruments" else self._retry_delay(None, attempt))
                     continue
                 return None, f"T212 DEMO connection error: {type(exc).__name__}: {exc}"
 
@@ -360,6 +365,9 @@ class Tools:
                 if payload and self.instrument_cache.is_fresh(payload) and not force:
                     return payload["instruments"], None, "disk"
 
+                # Even force=True cannot bypass the shared successful-fetch budget.
+                if payload and payload.get("instruments") and time.time() - float(payload.get("fetchedAtEpoch") or 0) < 50:
+                    return payload["instruments"], None, "disk-cooldown"
                 previous = payload.get("instruments", []) if payload else []
                 data, error = await self._request("GET", "/equity/metadata/instruments")
                 if error:
@@ -644,85 +652,50 @@ class Tools:
         ticker: str,
         quantity: float,
         extended_hours: bool = False,
+        intent_id: str = "",
     ) -> str:
-        """
-        Place a Trading 212 DEMO market order through the single broker gateway.
-        DEMO ONLY. Use only after the trading workflow has produced an explicit execution decision.
-        Never retry this method blindly because Trading 212 market-order POST is non-idempotent.
-        After this returns, call trading_dashboard or list_positions to verify the broker-side result.
+        """Submit one DEMO market decision and read back its broker status.
+
+        Reuse the same intent_id across retries/restarts. Use a new explicit ID only for
+        a distinct approved execution decision. Without an ID, the exact request gets a
+        permanent compatibility key; repeating it is blocked even after restart.
         :param side: BUY or SELL.
-        :param ticker: Exact Trading 212 internal ticker, such as AEMD_US_EQ.
-        :param quantity: Positive share quantity. This method applies the sign required by T212.
-        :param extended_hours: True only when intentionally submitting an extended-hours eligible order.
-        :return: Broker response as JSON text.
+        :param ticker: Exact Trading 212 internal ticker.
+        :param quantity: Positive finite share quantity; SELL is signed by this tool.
+        :param extended_hours: True only for an eligible extended-hours decision.
+        :param intent_id: Stable execution-decision ID; never change it to retry UNKNOWN.
+        :return: Broker readback and durable intent state as JSON text.
         """
-        side = side.strip().upper()
-        ticker = ticker.strip().upper()
-        quantity = float(quantity)
+        try:
+            side = side.strip().upper()
+            ticker = ticker.strip().upper()
+            if side not in ("BUY", "SELL") or not re.fullmatch(r"[A-Z0-9][A-Z0-9_.-]{0,63}", ticker):
+                raise ValueError("Valid BUY/SELL and exact broker ticker required")
+            quantity = self._positive(quantity, "quantity")
+            if not isinstance(extended_hours, bool):
+                raise ValueError("extended_hours must be boolean")
+            body = {"ticker": ticker, "quantity": quantity if side == "BUY" else -quantity, "extendedHours": extended_hours}
+            if intent_id == "":
+                intent_id = "legacy-market-" + hashlib.sha256(json.dumps(body, sort_keys=True, allow_nan=False).encode()).hexdigest()
+            result = json.loads(await self._durable_mutation(intent_id, "POST", "/equity/orders/market", body))
+            result.update(action=side, ticker=ticker, quantity=quantity, extendedHours=extended_hours)
+            return self._show(result)
+        except (ValueError, TypeError, AttributeError, OverflowError) as exc:
+            return self._show({"state": "VALIDATION_FAILED", "error": str(exc), "mutationAttempted": False, "environment": "DEMO", "liveTradingEnabled": False})
 
-        if side not in ("BUY", "SELL"):
-            return "Side must be BUY or SELL."
-
-        if quantity <= 0:
-            return "Quantity must be greater than zero."
-
-        fingerprint = (
-            side,
-            ticker,
-            round(quantity, 8),
-            bool(extended_hours),
-        )
-
-        now = time.monotonic()
-
-        if (
-            fingerprint == self.last_submission
-            and now - self.last_submission_time < 30
-        ):
-            return (
-                "DUPLICATE BLOCKED: identical DEMO order submitted "
-                "less than 30 seconds ago."
-            )
-
-        payload = {
-            "ticker": ticker,
-            "quantity": quantity if side == "BUY" else -quantity,
-            "extendedHours": bool(extended_hours),
-        }
-
-        self.last_submission = fingerprint
-        self.last_submission_time = now
-
-        data, error = await self._request(
-            "POST",
-            "/equity/orders/market",
-            json_body=payload,
-        )
-
-        if error:
-            return error
-
-        return self._show(
-            {
-                "environment": "DEMO",
-                "action": side,
-                "ticker": ticker,
-                "quantity": quantity,
-                "extendedHours": bool(extended_hours),
-                "brokerResponse": data,
-                "verificationRequired": True,
-                "liveTradingEnabled": False,
-            }
-        )
-
-    async def close_position(self, ticker: str) -> str:
+    async def close_position(self, ticker: str, intent_id: str = "") -> str:
         """
         Close the full available quantity of one existing Trading 212 DEMO position.
         DEMO ONLY. This submits a market SELL and must be verified afterwards.
         :param ticker: Exact Trading 212 internal ticker of the position to close.
+        :param intent_id: Stable close-decision ID. Omitted IDs permanently identify one close per ticker.
         :return: Broker response as JSON text.
         """
+        if not isinstance(ticker, str) or not re.fullmatch(r"[A-Z0-9][A-Z0-9_.-]{0,63}", ticker.strip().upper()):
+            return self._show({"state": "VALIDATION_FAILED", "mutationAttempted": False, "error": "Exact broker ticker required"})
         ticker = ticker.strip().upper()
+        if intent_id == "":
+            intent_id = "legacy-close-" + ticker
 
         data, error = await self._request("GET", "/equity/positions")
         if error:
@@ -751,6 +724,7 @@ class Tools:
             ticker=ticker,
             quantity=available,
             extended_hours=False,
+            intent_id=intent_id,
         )
 
     def _order_journal(self):
@@ -816,7 +790,9 @@ class Tools:
                     if error or not isinstance(existing, dict):
                         raise ValueError("Cannot verify order before cancellation")
                     if str(existing.get("status", "")).upper() in OrderIntentJournal.TERMINAL:
-                        return self._show({"state": existing["status"], "mutationAttempted": False, "brokerResponse": existing})
+                        state = str(existing["status"]).upper()
+                        result = journal.save(db, intent_id, state, {"mutationAttempted": False, "brokerResponse": existing, "verificationRequired": False, "retryAllowed": False}, path.rsplit("/", 1)[-1])
+                        return self._show(result)
                 # Commit the unresolved intent BEFORE transmission. A crash cannot authorize a replay.
                 unresolved = {"state": "UNKNOWN", "intentId": intent_id, "verificationRequired": True, "environment": "DEMO", "liveTradingEnabled": False}
                 db.execute("INSERT INTO intents VALUES (?,?,?,?,?,?)", (intent_id, fingerprint, encoded, "UNKNOWN", None, json.dumps(unresolved)))

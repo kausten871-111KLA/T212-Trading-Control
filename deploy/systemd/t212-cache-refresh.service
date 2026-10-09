@@ -11,9 +11,9 @@ User=katie
 WorkingDirectory=/home/katie/t212-scanner
 ExecStart=/usr/bin/python3 /home/katie/t212-scanner/scripts/refresh_t212_cache_worker.py
 Environment=T212_SCANNER_STATE_DIR=/var/lib/t212-scanner
-TimeoutStartSec=2min
-Restart=on-failure
-RestartSec=60s
+EnvironmentFile=/etc/t212/demo-cache.env
+TimeoutStartSec=12min
+Restart=no
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true

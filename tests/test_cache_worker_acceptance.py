@@ -62,6 +62,16 @@ class CacheWorkerAcceptanceTests(unittest.TestCase):
         self.assertEqual(len(attempts), 3)
         self.assertEqual(sleeps, [50.0, 50.0])
 
+    def test_worker_reuses_recent_tool_snapshot_without_metadata_call(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            with mock.patch.multiple(WORKER,DATA_DIR=root,CACHE=root/'t212_instrument_cache.json',DIFF=root/'diff.json',LOCK=root/'t212_instrument_cache.lock',STATUS=root/'status.json'):
+                WORKER.atomic(WORKER.CACHE,{'environment':'DEMO','fetchedAtEpoch':WORKER.time.time(),'instruments':[{'ticker':'SAFE_US_EQ'}]})
+                with mock.patch.dict(os.environ,{'T212_DEMO_API_KEY':'synthetic','T212_DEMO_API_SECRET':'synthetic'}), mock.patch.object(WORKER.urllib.request,'urlopen') as request:
+                    self.assertEqual(WORKER.main(),0)
+                    request.assert_not_called()
+                self.assertEqual(json.loads(WORKER.STATUS.read_text())['cache_source'],'disk-cooldown')
+
     def test_long_provider_cooldown_aborts_without_early_retry(self):
         calls=[]
         def request(*args, **kwargs):

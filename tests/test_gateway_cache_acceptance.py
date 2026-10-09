@@ -79,6 +79,17 @@ class GatewayCacheAcceptanceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(os.stat(tool.instrument_cache.cache_path).st_mode & 0o777, 0o600)
             self.assertEqual(os.stat(tool.instrument_cache.lock_path).st_mode & 0o777, 0o600)
 
+    async def test_force_refresh_cannot_bypass_recent_successful_fetch_budget(self):
+        with tempfile.TemporaryDirectory() as td:
+            tool=self._tool(td);calls=[]
+            async def request(method,path,json_body=None):
+                calls.append(path);return [{'ticker':'ACME_US_EQ','name':'Acme'}],None
+            tool._request=request
+            await tool.refresh_instrument_cache()
+            result=json.loads(await self._tool(td).refresh_instrument_cache(force=True))
+            self.assertEqual(result['cacheSource'],'disk-cooldown')
+            self.assertEqual(len(calls),1)
+
     async def test_concurrent_lookups_share_one_refresh(self):
         instruments = [{"ticker": "ABC_US_EQ", "name": "ABC", "type": "STOCK"}]
         calls = 0

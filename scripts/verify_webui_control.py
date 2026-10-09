@@ -15,6 +15,7 @@ from openwebui.tools.model_router import validate_router_config
 from openwebui.tools.plugin_registry import validate_registry
 from openwebui.tools.workspace_pipeline import validate_pipeline_config
 from openwebui.tools.credit_control import validate_policy
+from openwebui.tools.t212_risk_gate import position_count_limit
 from scripts.validate_workspace_runtime_contract import validate as validate_workspace_contract
 
 
@@ -107,8 +108,7 @@ def validate_risk_controls(config: dict) -> None:
     controls = config.get("controls") or {}
     if controls.get("long_only") is not True or controls.get("shorting") is not False:
         raise ValueError("risk controls must remain long-only with shorting disabled")
-    if controls.get("max_concurrent_positions") != 3:
-        raise ValueError("recovered max concurrent position control drifted")
+    position_count_limit(config)  # Legacy positive caps or referenced DEMO-only relaxation.
     if float(controls.get("normal_session_spread_ceiling_pct_midpoint", -1)) != 2.5:
         raise ValueError("recovered spread ceiling drifted")
     if controls.get("averaging_down") is not False:
