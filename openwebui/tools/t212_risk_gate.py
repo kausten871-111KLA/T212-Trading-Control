@@ -7,6 +7,7 @@ broker-mirrored portfolio snapshot and returns explicit PASS/REJECT evidence.
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -22,7 +23,10 @@ class RiskGateError(ValueError):
 
 def _num(value: Any, field: str) -> float:
     try:
-        return float(value)
+        number = float(value)
+        if isinstance(value, bool) or not math.isfinite(number):
+            raise RiskGateError(f"{field} must be finite numeric")
+        return number
     except (TypeError, ValueError) as exc:
         raise RiskGateError(f"{field} must be numeric") from exc
 
@@ -51,6 +55,22 @@ def load_controls(path: str | Path = DEFAULT_CONFIG) -> dict[str, Any]:
     if config.get("environment") != "DEMO":
         raise RiskGateError("risk controls must remain DEMO")
     return config
+
+
+def position_count_limit(config: Mapping[str, Any]) -> int | None:
+    """Only an explicit, referenced DEMO count-only authorization removes the cap."""
+    rules = config.get("controls") or {}
+    value = rules.get("max_concurrent_positions", "MISSING")
+    policy = config.get("position_count_policy") or {}
+    if value is None:
+        if (config.get("environment") != "DEMO" or policy.get("mode") != "demo_count_only_relaxation"
+                or policy.get("approved") is not True or not policy.get("approval_reference")
+                or policy.get("other_risk_limits_unchanged") is not True):
+            raise RiskGateError("Count relaxation requires explicit DEMO authorization")
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise RiskGateError("max_concurrent_positions must be a positive integer or authorized null")
+    return value
 
 
 def evaluate(
@@ -143,7 +163,8 @@ def evaluate(
         reasons.append("POSITION_VALUE_LIMIT")
     if exposure > spendable_cash:
         reasons.append("AVAILABLE_CASH_LIMIT")
-    if open_positions >= int(rules["max_concurrent_positions"]):
+    count_limit = position_count_limit(config)
+    if count_limit is not None and open_positions >= count_limit:
         reasons.append("MAX_CONCURRENT_POSITIONS")
     if aggregate_risk + planned_loss > max_aggregate:
         reasons.append("AGGREGATE_OPEN_RISK_LIMIT")

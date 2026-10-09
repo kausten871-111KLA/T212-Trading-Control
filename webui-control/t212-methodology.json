@@ -75,16 +75,50 @@
   },
   "qualification": {
     "required_states": {
-      "price_direction": ["GREEN", "RED"],
-      "momentum": ["HIGH", "LOW"],
-      "relative_volume": ["HIGH", "NORMAL", "LOW"],
-      "liquidity": ["PASS", "FAIL"],
-      "spread": ["PASS", "FAIL"],
-      "cause": ["CONFIRMED", "PROBABLE", "UNKNOWN"],
-      "market_sector_support": ["YES", "NO", "MIXED"],
-      "move_exhaustion": ["EARLY", "MID", "LATE"],
-      "external_corroboration": ["YES", "NO"],
-      "t212_execution_status": ["PASS", "FAIL"]
+      "price_direction": [
+        "GREEN",
+        "RED"
+      ],
+      "momentum": [
+        "HIGH",
+        "LOW"
+      ],
+      "relative_volume": [
+        "HIGH",
+        "NORMAL",
+        "LOW"
+      ],
+      "liquidity": [
+        "PASS",
+        "FAIL"
+      ],
+      "spread": [
+        "PASS",
+        "FAIL"
+      ],
+      "cause": [
+        "CONFIRMED",
+        "PROBABLE",
+        "UNKNOWN"
+      ],
+      "market_sector_support": [
+        "YES",
+        "NO",
+        "MIXED"
+      ],
+      "move_exhaustion": [
+        "EARLY",
+        "MID",
+        "LATE"
+      ],
+      "external_corroboration": [
+        "YES",
+        "NO"
+      ],
+      "t212_execution_status": [
+        "PASS",
+        "FAIL"
+      ]
     },
     "explicit_unknown_allowed": true,
     "fixed_rejection_reason_required": true
@@ -173,7 +207,7 @@
     "baseline_equity_gbp": 300,
     "planned_loss_per_trade": "lower_of_1pct_equity_or_3_gbp",
     "position_value": "lower_of_25pct_equity_or_75_gbp",
-    "max_concurrent_positions": 3,
+    "max_concurrent_positions": null,
     "aggregate_open_risk": "lower_of_3pct_equity_or_9_gbp",
     "daily_loss_stop": "lower_of_2pct_starting_daily_equity_or_6_gbp",
     "weekly_loss_stop": "lower_of_4pct_starting_weekly_equity_or_12_gbp",
@@ -184,7 +218,8 @@
     "recalculate_from_verified_broker_equity": true,
     "legacy_positions_do_not_authorize_new_trade_sizing": true,
     "shared_cash_and_risk_authority": true,
-    "prevent_double_allocation_across_controllers": true
+    "prevent_double_allocation_across_controllers": true,
+    "position_count_policy_reference": "t212-risk-controls.json#/position_count_policy"
   },
   "learning": {
     "missed_greens_review": true,

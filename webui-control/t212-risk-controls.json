@@ -1,16 +1,40 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "workspace": "t212-demo",
   "environment": "DEMO",
   "source": "Recovered Shared Portfolio Ledger and 22 Sep EOD control envelope",
   "controls": {
-    "planned_loss_per_trade": {"rule":"lower_of","equity_pct":1.0,"absolute_gbp":3.0},
-    "position_value": {"rule":"lower_of","equity_pct":25.0,"absolute_gbp":75.0},
-    "max_concurrent_positions": 3,
-    "aggregate_open_risk": {"rule":"lower_of","equity_pct":3.0,"absolute_gbp":9.0},
-    "daily_loss_stop": {"rule":"lower_of","starting_daily_equity_pct":2.0,"absolute_gbp":6.0},
-    "weekly_loss_stop": {"rule":"lower_of","starting_weekly_equity_pct":4.0,"absolute_gbp":12.0},
-    "experiment_drawdown_stop": {"rule":"lower_of","high_water_equity_pct":10.0,"absolute_gbp":30.0},
+    "planned_loss_per_trade": {
+      "rule": "lower_of",
+      "equity_pct": 1.0,
+      "absolute_gbp": 3.0
+    },
+    "position_value": {
+      "rule": "lower_of",
+      "equity_pct": 25.0,
+      "absolute_gbp": 75.0
+    },
+    "max_concurrent_positions": null,
+    "aggregate_open_risk": {
+      "rule": "lower_of",
+      "equity_pct": 3.0,
+      "absolute_gbp": 9.0
+    },
+    "daily_loss_stop": {
+      "rule": "lower_of",
+      "starting_daily_equity_pct": 2.0,
+      "absolute_gbp": 6.0
+    },
+    "weekly_loss_stop": {
+      "rule": "lower_of",
+      "starting_weekly_equity_pct": 4.0,
+      "absolute_gbp": 12.0
+    },
+    "experiment_drawdown_stop": {
+      "rule": "lower_of",
+      "high_water_equity_pct": 10.0,
+      "absolute_gbp": 30.0
+    },
     "minimum_reward_risk_to_first_target": 2.0,
     "normal_session_spread_ceiling_pct_midpoint": 2.5,
     "max_expected_friction_pct_planned_risk": 25.0,
@@ -38,5 +62,11 @@
     "reconcile_after_every_broker_write": true,
     "prefer_consolidated_operations_dashboard": true,
     "avoid_parallel_broker_reconciliation_bursts": true
+  },
+  "position_count_policy": {
+    "mode": "demo_count_only_relaxation",
+    "approved": true,
+    "approval_reference": "https://github.com/kausten871-111KLA/T212-Trading-Control/issues/5#issuecomment-6076298265",
+    "other_risk_limits_unchanged": true
   }
 }
