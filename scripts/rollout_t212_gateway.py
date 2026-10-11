@@ -60,14 +60,19 @@ def inspect_current(api, expected_sha):
     return current
 
 
+def verify_identity(current, baseline):
+    for field in ('id', 'name', 'meta', 'access_grants'):
+        if field not in current or field not in baseline or current[field] != baseline[field]:
+            raise ValueError('Tool identity, metadata or access grants changed; reconcile before update')
+
+
 def verify_readback(current, expected_source, baseline, required_methods):
     if digest(current.get('content','')) != digest(expected_source):
         raise ValueError('Source readback mismatch; do not claim deployed')
     specs = {s.get('name') for s in current.get('specs',[]) if isinstance(s,dict)}
     if not required_methods.issubset(specs):
         raise ValueError('Installed method schemas missing; deployment acceptance failed')
-    if current.get('access_grants') != baseline.get('access_grants'):
-        raise ValueError('Tool access grants changed; deployment acceptance failed')
+    verify_identity(current, baseline)
 
 
 def apply(api, source, expected_sha, backup_path, owner_lease):
@@ -79,7 +84,8 @@ def apply(api, source, expected_sha, backup_path, owner_lease):
     fd = os.open(backup_path, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
     with os.fdopen(fd,'w') as handle:
         json.dump(backup,handle);handle.flush();os.fsync(handle.fileno())
-    inspect_current(api, expected_sha)  # Refuse intervening edits immediately before POST.
+    current = inspect_current(api, expected_sha)
+    verify_identity(current, baseline)  # Refuse same-source metadata/grant edits before POST.
     response_lost = False
     try:
         api.request('POST','/update',payload)  # Exactly one update attempt.
@@ -94,8 +100,11 @@ def rollback(api, backup_path, owner_lease):
     if not owner_lease:
         raise ValueError('Exclusive Engineering owner lease is required')
     backup = json.loads(Path(backup_path).read_text())
+    if backup.get('owner_lease') != owner_lease:
+        raise ValueError('Rollback lease differs from backup owner; explicit owner-reviewed transfer required')
     baseline = backup['baseline']
-    inspect_current(api,backup['candidate_sha256'])  # Never overwrite another owner's newer source.
+    current = inspect_current(api,backup['candidate_sha256'])
+    verify_identity(current, baseline)  # Never overwrite another owner's metadata or grants.
     payload=form(baseline,baseline['content'])
     response_lost=False
     try:
