@@ -773,6 +773,16 @@ class Tools:
         try:
             if not isinstance(intent_id, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", intent_id):
                 raise ValueError("A stable explicit intent_id is required")
+            if method == "POST":
+                if path not in {"/equity/orders/market", "/equity/orders/limit", "/equity/orders/stop", "/equity/orders/stop_limit"}:
+                    raise ValueError("Unsupported order mutation path")
+                quantity = body.get("quantity")
+                if isinstance(quantity, bool) or not isinstance(quantity, (int, float)) or not math.isfinite(quantity) or quantity == 0:
+                    raise ValueError("A finite nonzero signed order quantity is required")
+                if not isinstance(body.get("ticker"), str) or not body["ticker"].strip():
+                    raise ValueError("A broker ticker is required")
+            elif method != "DELETE" or not re.fullmatch(r"/equity/orders/[0-9]+", path):
+                raise ValueError("Unsupported order mutation")
             journal = self._order_journal()
             payload = {"method": method, "path": path, "body": body}
             encoded = json.dumps(payload, sort_keys=True, allow_nan=False)
@@ -783,6 +793,11 @@ class Tools:
                     if previous[0] != fingerprint:
                         raise ValueError("intent_id already identifies a different request")
                     return self._show(dict(json.loads(previous[1]), replayBlocked=True))
+                if method == "POST" and body["quantity"] > 0:
+                    # An LLM-supplied PASS flag is not execution authority. Until the
+                    # broker-state producer/evaluator contract is accepted, no new
+                    # risk-increasing order may cross the transport boundary.
+                    raise ValueError("RISK_ADMISSION_UNAVAILABLE: fresh broker-backed risk evidence is required; BUY blocked")
                 if method == "POST" and body["quantity"] < 0:
                     await self._sell_capacity(db, body["ticker"], abs(body["quantity"]))
                 if method == "DELETE":
@@ -864,3 +879,4 @@ class Tools:
                 return self._show(dict(json.loads(row[1]), readbackError=error, retryAllowed=False))
             state = str(data.get("status", "UNKNOWN")).upper()
             return self._show(journal.save(db, intent_id, state, {"brokerOrderId": row[0], "brokerResponse": data, "verificationRequired": state not in OrderIntentJournal.TERMINAL, "retryAllowed": False}, row[0]))
+

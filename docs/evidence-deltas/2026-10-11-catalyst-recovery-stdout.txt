@@ -1,0 +1,46 @@
+test_active_claim_is_not_double_processed (test_catalyst_consumer.CatalystConsumerTests.test_active_claim_is_not_double_processed) ... ok
+test_consumer_is_bounded_to_five (test_catalyst_consumer.CatalystConsumerTests.test_consumer_is_bounded_to_five) ... ok
+test_daily_budget_and_deduplication (test_catalyst_consumer.CatalystConsumerTests.test_daily_budget_and_deduplication) ... ok
+test_expired_claim_is_recovered_after_crash (test_catalyst_consumer.CatalystConsumerTests.test_expired_claim_is_recovered_after_crash) ... ok
+test_result_validation_rejects_symbol_mismatch_and_unsourced_claim (test_catalyst_consumer.CatalystConsumerTests.test_result_validation_rejects_symbol_mismatch_and_unsourced_claim) ... ok
+test_retry_then_terminal_failure (test_catalyst_consumer.CatalystConsumerTests.test_retry_then_terminal_failure) ... ok
+test_successful_consumer_acknowledges_and_keeps_no_order_authority (test_catalyst_consumer.CatalystConsumerTests.test_successful_consumer_acknowledges_and_keeps_no_order_authority) ... ok
+test_invalid_numeric_payload_preserves_previous_queue (test_catalyst_queue_concurrency.ConcurrentQueue.test_invalid_numeric_payload_preserves_previous_queue) ... ok
+test_multiple_processes_preserve_unique_rows_and_deduplicate (test_catalyst_queue_concurrency.ConcurrentQueue.test_multiple_processes_preserve_unique_rows_and_deduplicate) ... ok
+test_only_one_process_claims_unexpired_event (test_catalyst_queue_concurrency.ConcurrentQueue.test_only_one_process_claims_unexpired_event) ... ok
+test_symlink_destination_cannot_replace_target (test_catalyst_queue_concurrency.ConcurrentQueue.test_symlink_destination_cannot_replace_target) ... ok
+test_concurrent_exporters_write_one_receipt (test_catalyst_recovery.Recovery.test_concurrent_exporters_write_one_receipt) ... ok
+test_corrupt_or_conflicting_log_does_not_mark_exported (test_catalyst_recovery.Recovery.test_corrupt_or_conflicting_log_does_not_mark_exported) ... ok
+test_corrupt_queue_blocks_mutation_without_erasing_evidence (test_catalyst_recovery.Recovery.test_corrupt_queue_blocks_mutation_without_erasing_evidence) ... ok
+test_crash_after_log_commit_before_marker_is_idempotent (test_catalyst_recovery.Recovery.test_crash_after_log_commit_before_marker_is_idempotent) ... ok
+test_expired_crashes_cannot_repeat_provider_work_without_bound (test_catalyst_recovery.Recovery.test_expired_crashes_cannot_repeat_provider_work_without_bound) ... ok
+test_expired_or_missing_token_cannot_commit (test_catalyst_recovery.Recovery.test_expired_or_missing_token_cannot_commit) ... ok
+test_failed_replace_preserves_queue_and_recovery_intent (test_catalyst_recovery.Recovery.test_failed_replace_preserves_queue_and_recovery_intent) ... ok
+test_legacy_attempts_are_preserved_when_new_accounting_starts (test_catalyst_recovery.Recovery.test_legacy_attempts_are_preserved_when_new_accounting_starts) ... ok
+test_legacy_claims_cannot_reset_daily_attempt_budget (test_catalyst_recovery.Recovery.test_legacy_claims_cannot_reset_daily_attempt_budget) ... ok
+test_legacy_done_record_and_existing_log_recover_without_duplication (test_catalyst_recovery.Recovery.test_legacy_done_record_and_existing_log_recover_without_duplication) ... ok
+test_main_recovers_local_outbox_outside_session_without_provider (test_catalyst_recovery.Recovery.test_main_recovers_local_outbox_outside_session_without_provider) ... ok
+test_old_claim_cannot_acknowledge_or_retry_reassigned_work (test_catalyst_recovery.Recovery.test_old_claim_cannot_acknowledge_or_retry_reassigned_work) ... ok
+test_process_death_before_and_after_atomic_log_replace_recovers (test_catalyst_recovery.Recovery.test_process_death_before_and_after_atomic_log_replace_recovers) ... ok
+test_recovery_cli_is_provider_free_and_replay_safe (test_catalyst_recovery.Recovery.test_recovery_cli_is_provider_free_and_replay_safe) ... ok
+test_result_and_outbox_survive_process_exit_before_export (test_catalyst_recovery.Recovery.test_result_and_outbox_survive_process_exit_before_export) ... ok
+test_retry_claims_consume_daily_budget_and_resume_next_day (test_catalyst_recovery.Recovery.test_retry_claims_consume_daily_budget_and_resume_next_day) ... ok
+test_slow_reviewer_never_reports_false_completion (test_catalyst_recovery.Recovery.test_slow_reviewer_never_reports_false_completion) ... ok
+
+----------------------------------------------------------------------
+Ran 28 tests in 0.260s
+
+OK
+test_scan_queue_review_reload_preserves_identifiers (test_scan_event_correlation.Correlation.test_scan_queue_review_reload_preserves_identifiers) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.017s
+
+OK
+test_bad_json_and_symlink_do_not_damage_existing_data (test_review_log_durability.ReviewLog.test_bad_json_and_symlink_do_not_damage_existing_data) ... ok
+test_concurrent_reviews_survive_process_exit_and_reload (test_review_log_durability.ReviewLog.test_concurrent_reviews_survive_process_exit_and_reload) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.034s
+
+OK

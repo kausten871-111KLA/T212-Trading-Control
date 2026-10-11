@@ -32,7 +32,7 @@ class Pipe(Tools):
                 "SELL <T212_TICKER> <QUANTITY>\n"
                 "SELL EXT <T212_TICKER> <QUANTITY>\n"
                 "CLOSE <T212_TICKER>\n\n"
-                "Append INTENT <decision-id> to BUY/SELL/CLOSE. Reuse it for retries. Omitted IDs permanently block identical repeats. DEMO only."
+                "Append INTENT <decision-id> to BUY/SELL/CLOSE. Reuse it for retries. Omitted IDs permanently block identical repeats. DEMO only. New BUY admission is blocked until broker-backed risk integration is accepted."
             )
 
         if command.upper() == "ACCOUNT":
@@ -76,7 +76,10 @@ class Pipe(Tools):
                     "positions": positions,
                     "pendingOrderCount": len(orders),
                     "pendingOrders": orders,
-                    "executionEnabled": True,
+                    "executionEnabled": False,
+                    "riskIncreasingExecutionEnabled": False,
+                    "holdingsVerifiedExitAvailable": True,
+                    "riskAdmissionState": "BLOCKED_PENDING_BROKER_BACKED_INTEGRATION",
                     "liveTradingEnabled": False,
                 }
             )
@@ -175,3 +178,4 @@ class Pipe(Tools):
             return await self.close_position(match.group(1).upper(), match.group(2) or "")
 
         return "Command not recognised. Use HELP."
+

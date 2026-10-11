@@ -1,0 +1,31 @@
+test_close_can_reduce_verified_holdings (test_risk_boundary_containment.Boundary.test_close_can_reduce_verified_holdings) ... ok
+test_dashboard_does_not_claim_buy_execution_enabled (test_risk_boundary_containment.Boundary.test_dashboard_does_not_claim_buy_execution_enabled) ... ok
+test_direct_private_boundary_rejects_buy (test_risk_boundary_containment.Boundary.test_direct_private_boundary_rejects_buy) ... ok
+test_every_buy_type_rejects_before_transport (test_risk_boundary_containment.Boundary.test_every_buy_type_rejects_before_transport) ... ok
+test_live_base_refused_before_transport (test_risk_boundary_containment.Boundary.test_live_base_refused_before_transport) ... ok
+test_malformed_private_mutations_never_reach_transport (test_risk_boundary_containment.Boundary.test_malformed_private_mutations_never_reach_transport) ... ok
+test_pipe_command_cannot_bypass_admission (test_risk_boundary_containment.Boundary.test_pipe_command_cannot_bypass_admission) ... ok
+test_pipe_is_exactly_generated (test_risk_boundary_containment.Boundary.test_pipe_is_exactly_generated) ... ok
+test_sell_reservation_still_prevents_overcommit (test_risk_boundary_containment.Boundary.test_sell_reservation_still_prevents_overcommit) ... ok
+test_unknown_sell_reloads_without_resubmission (test_risk_boundary_containment.Boundary.test_unknown_sell_reloads_without_resubmission) ... ok
+test_bounded_proposal_passes_with_approved_count_relaxation (test_risk_input_regression.RiskInputs.test_bounded_proposal_passes_with_approved_count_relaxation) ... ok
+test_future_broker_timestamp_rejected (test_risk_input_regression.RiskInputs.test_future_broker_timestamp_rejected) ... ok
+test_future_proposal_timestamp_rejected (test_risk_input_regression.RiskInputs.test_future_proposal_timestamp_rejected) ... ok
+test_missing_portfolio_metrics_never_default_to_zero (test_risk_input_regression.RiskInputs.test_missing_portfolio_metrics_never_default_to_zero) ... ok
+test_negative_friction_spread_partial_prices_and_naive_clock_rejected (test_risk_input_regression.RiskInputs.test_negative_friction_spread_partial_prices_and_naive_clock_rejected) ... ok
+test_negative_nonfinite_and_fractional_state_rejected (test_risk_input_regression.RiskInputs.test_negative_nonfinite_and_fractional_state_rejected) ... ok
+test_retained_loss_exposure_cash_spread_gates (test_risk_input_regression.RiskInputs.test_retained_loss_exposure_cash_spread_gates) ... ok
+test_stale_broker_and_live_environment_rejected (test_risk_input_regression.RiskInputs.test_stale_broker_and_live_environment_rejected) ... ok
+test_strategy_flags_and_sell_are_not_entry_admission (test_risk_input_regression.RiskInputs.test_strategy_flags_and_sell_are_not_entry_admission) ... ok
+test_underdeclared_exposure_rejected (test_risk_input_regression.RiskInputs.test_underdeclared_exposure_rejected) ... ok
+test_account_and_intent_identity_must_match (test_risk_request_binding.Binding.test_account_and_intent_identity_must_match) ... ok
+test_bound_payload_cannot_understate_risk_quantity_or_price (test_risk_request_binding.Binding.test_bound_payload_cannot_understate_risk_quantity_or_price) ... ok
+test_exact_valid_request_passes_pure_gate (test_risk_request_binding.Binding.test_exact_valid_request_passes_pure_gate) ... ok
+test_fx_and_currency_inputs_required (test_risk_request_binding.Binding.test_fx_and_currency_inputs_required) ... ok
+test_payload_changes_cannot_reuse_proposal (test_risk_request_binding.Binding.test_payload_changes_cannot_reuse_proposal) ... ok
+test_risk_rejection_is_not_admission (test_risk_request_binding.Binding.test_risk_rejection_is_not_admission) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 0.024s
+
+OK
