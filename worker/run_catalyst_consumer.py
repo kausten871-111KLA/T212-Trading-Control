@@ -11,6 +11,7 @@ import json
 import fcntl
 import os
 import sys
+import uuid
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -66,18 +67,78 @@ def atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    _persist_review(path, payload, idempotent=False)
+
+
+def _persist_review(path: Path, payload: dict[str, Any], *, idempotent: bool) -> bool:
+    """Atomic local-file projection; replay never duplicates a receipt."""
     encoded = json.dumps(payload, sort_keys=True, default=str, allow_nan=False) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(fd, "a", encoding="utf-8") as handle:
-        os.fchmod(handle.fileno(), 0o600)
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "a") as lock:
+        os.fchmod(lock.fileno(), 0o600)
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         try:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
+            if path.is_symlink():
+                raise OSError("Review destination must not be a symlink")
+            original = path.read_text(encoding="utf-8") if path.exists() else ""
+            for line in original.splitlines():
+                if not line.strip():
+                    continue
+                row = json.loads(line)  # Corruption blocks writes; never discard evidence.
+                if not isinstance(row, dict):
+                    raise ValueError("Invalid review log record")
+                if idempotent and (row.get("receipt_id") == payload["receipt_id"] or row.get("event_id") == payload["event_id"]):
+                    fields = ("event_id", "scan_id", "scanner_event_id", "result")
+                    if any(row.get(field) != payload.get(field) for field in fields):
+                        raise ValueError("Conflicting review receipt; preserve evidence")
+                    # Recovery may observe a replace whose directory fsync was
+                    # interrupted. Make the existing receipt durable before ACK.
+                    existing = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+                    try:
+                        os.fchmod(existing, 0o600)
+                        os.fsync(existing)
+                    finally:
+                        os.close(existing)
+                    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                    try:
+                        os.fsync(directory)
+                    finally:
+                        os.close(directory)
+                    return False
+            temporary = path.with_suffix(path.suffix + "." + uuid.uuid4().hex + ".tmp")
+            try:
+                descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    handle.write(original)
+                    if original and not original.endswith("\n"):
+                        handle.write("\n")
+                    handle.write(encoded)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                temporary.replace(path)
+                directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+            finally:
+                temporary.unlink(missing_ok=True)
+            return True
         finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def flush_review_outbox(queue: CatalystHandoffQueue, path: Path, *, limit: int = 100) -> dict[str, int]:
+    delivered = replayed = 0
+    for receipt in queue.pending_reviews(limit):
+        inserted = _persist_review(path, receipt, idempotent=True)
+        if not queue.mark_review_exported(receipt["event_id"], receipt["receipt_id"]):
+            raise ReviewError("Review persisted but queue export receipt could not be marked")
+        delivered += int(inserted)
+        replayed += int(not inserted)
+    return {"delivered": delivered, "replayed": replayed}
 
 
 def validate_result(candidate: dict[str, Any], result: Any) -> dict[str, Any]:
@@ -158,35 +219,46 @@ def consume(
     max_attempts: int = MAX_ATTEMPTS,
     lease_seconds: int = LEASE_SECONDS,
     now: datetime | None = None,
+    clock=None,
 ) -> dict[str, Any]:
-    observed = now or datetime.now(timezone.utc)
+    clock = clock or (lambda: now if now is not None else datetime.now(timezone.utc))
+    observed = clock()
     requested = min(5, max(1, int(max_per_run)))
     completed = []
     retried = []
     failed = []
+    lease_lost = []
     for event in queue.pending(requested, now=observed):
-        claimed = queue.claim(event["id"], lease_seconds=lease_seconds, now=observed)
+        claimed = queue.claim(event["id"], lease_seconds=lease_seconds, max_attempts=max_attempts, now=clock())
         if not claimed:
             continue
         try:
             result = validate_result(claimed["candidate"], reviewer.review(claimed["candidate"]))
-            queue.acknowledge(claimed["id"], result=result, now=observed)
+            acknowledged = queue.acknowledge(claimed["id"], result=result, lease_token=claimed["lease_token"], now=clock())
+            if not acknowledged:
+                lease_lost.append({"event_id": claimed["id"], "reason": "claim_expired_or_reassigned"})
+                continue
             completed.append({"event_id": claimed["id"], "scan_id": claimed["candidate"].get("scan_id"), "scanner_event_id": claimed["candidate"].get("scanner_event_id"), "result": result})
         except Exception as exc:
             updated = queue.retry(
                 claimed["id"],
                 error=f"{type(exc).__name__}: {exc}",
+                lease_token=claimed["lease_token"],
                 max_attempts=max_attempts,
-                now=observed,
+                now=clock(),
             )
+            if not updated:
+                lease_lost.append({"event_id": claimed["id"], "reason": "claim_expired_or_reassigned"})
+                continue
             target = failed if updated and updated.get("status") == "failed" else retried
             target.append({"event_id": claimed["id"], "error_type": type(exc).__name__})
     return {
-        "processed": len(completed) + len(retried) + len(failed),
+        "processed": len(completed) + len(retried) + len(failed) + len(lease_lost),
         "completed": completed,
         "retried": retried,
         "failed": failed,
-        "queue": queue.stats(now=observed),
+        "lease_lost": lease_lost,
+        "queue": queue.stats(now=clock()),
         "orders_submitted": 0,
         "live_trading_enabled": False,
         "order_mutation_enabled": False,
@@ -209,6 +281,9 @@ def main() -> int:
         "live_trading_enabled": False,
         "order_mutation_enabled": False,
     }
+    queue = CatalystHandoffQueue(path=QUEUE_PATH, max_per_day=MAX_PER_DAY)
+    # Local recovery does not require a market session, credentials or provider.
+    base["review_recovery"] = flush_review_outbox(queue, REVIEW_LOG)
     if not decision.allowed:
         _write_status({**base, "ok": True, "skipped": True, "reason": decision.reason})
         return 0
@@ -216,7 +291,6 @@ def main() -> int:
     url = os.getenv("T212_CATALYST_REVIEW_URL", "").strip()
     token = os.getenv("T212_CATALYST_REVIEW_TOKEN", "").strip()
     model = os.getenv("WEBUI_MODEL_DEEP_REASONING", "").strip()
-    queue = CatalystHandoffQueue(path=QUEUE_PATH, max_per_day=MAX_PER_DAY)
     if not (url and token and model):
         _write_status(
             {
@@ -235,13 +309,28 @@ def main() -> int:
         model=model,
         timeout_seconds=int(os.getenv("T212_CATALYST_TIMEOUT_SECONDS", "30")),
     )
-    result = consume(queue, reviewer, now=observed)
-    for item in result["completed"]:
-        append_jsonl(REVIEW_LOG, {"reviewed_at": observed.isoformat(), **item})
-    _write_status({**base, "ok": not result["failed"], **result})
-    return 0 if not result["failed"] else 1
+    result = consume(queue, reviewer)
+    result["review_delivery"] = flush_review_outbox(queue, REVIEW_LOG)
+    ok = not result["failed"] and not result["lease_lost"]
+    _write_status({**base, "ok": ok, **result})
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--recover-reviews-only", action="store_true",
+                        help="Deliver persisted review receipts locally without calling a provider")
+    parser.add_argument("--queue", type=Path, default=QUEUE_PATH)
+    parser.add_argument("--review-log", type=Path, default=REVIEW_LOG)
+    arguments = parser.parse_args()
+    if arguments.recover_reviews_only:
+        recovery = flush_review_outbox(CatalystHandoffQueue(arguments.queue), arguments.review_log)
+        print(json.dumps({"ok": True, "recovery_only": True, "provider_calls": 0,
+                          "orders_submitted": 0, **recovery}, sort_keys=True))
+        raise SystemExit(0)
+    if arguments.queue != QUEUE_PATH or arguments.review_log != REVIEW_LOG:
+        parser.error("path overrides require --recover-reviews-only")
     raise SystemExit(main())
 

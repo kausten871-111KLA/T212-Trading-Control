@@ -1,6 +1,6 @@
 # 50-action progress overlay — 11 October 2026
 
-Preserves every original ID, owner and dependency. Partial code/tests do not complete parent acceptance. This is a scoped overlay, not a new master register. No current58/92 owner crosswalk supplied; totals below apply only to these50 rows.
+Preserves every original ID, owner and dependency. Partial code/tests do not complete parent acceptance. This is a scoped overlay, not a new master register. Original58 crosswalk retained in Issue5 comment6084054244; full92 master runtime rows not freshly revalidated. Totals below apply only to these50 rows.
 
 | ID | Status | Original action | Owner | Dependencies | Evidence / next requirement |
 |---|---|---|---|---|---|
@@ -48,7 +48,7 @@ Preserves every original ID, owner and dependency. Partial code/tests do not com
 | A42 | ⚠️ BLOCKED / HUMAN ACTION REQUIRED | Test real completion handler two-run append to identical persisted chat | Engineering | 41 | Real completion-handler/provider environment not exercised; no Katie-only action established |
 | A43 | 🔄 IN PROGRESS | Test manual edit overlap, mid-append crash, replay and idempotency | Engineering | 42 | Lost occurrence reproduced; durable outbox repair outstanding |
 | A44 | ⏳ QUEUED | Choose channel/reporting architecture based on measured cost, not assumptions | Site Configurator + DeepSeek | 42 | No new execution evidence in this sprint; preserve original dependency and acceptance |
-| A45 | 🔄 IN PROGRESS | Complete canonical event ledger producer-store-consumer correlation mapping | Engineering + Site Configurator | 43 | Durable ledger IDs, queue lock/fsync and scan→review correlation implemented; order/outcome links pending |
+| A45 | 🔄 IN PROGRESS | Complete canonical event ledger producer-store-consumer correlation mapping | Engineering + Site Configurator | 43 | Durable ledger IDs, fenced queue leases, bounded retry accounting, atomic review outbox and scan→review-log correlation implemented; 31 targeted checks pass (17 new recovery methods); order/outcome and runtime acceptance pending |
 | A46 | ⏳ QUEUED | Reconcile DeepSeek OPEN/MIDDAY/CLOSE runs with broker actions and exceptions | DeepSeek | 37 or existing legacy tools | No new execution evidence in this sprint; preserve original dependency and acceptance |
 | A47 | ⏳ QUEUED | Validate actual market research funnel, dated inputs and missed-green reviews | DeepSeek + Engineering | 45,46 | No new execution evidence in this sprint; preserve original dependency and acceptance |
 | A48 | 🔄 IN PROGRESS | Refresh outdated Executive Orchestra and Engineering handoff directives | Orchestra + user review | 41–47 | Combined handoff removes outdated version/two-job assumptions without changing schedules |

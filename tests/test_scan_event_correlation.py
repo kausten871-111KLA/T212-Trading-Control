@@ -1,5 +1,6 @@
 """Offline correlation acceptance with real ledger, queue and consumer."""
 import importlib.util
+import json
 import sys
 import tempfile
 import types
@@ -53,6 +54,12 @@ class Correlation(unittest.TestCase):
             reloaded = queue.CatalystHandoffQueue(jobs.path).completed()[0]
             self.assertEqual(reloaded['candidate']['scanner_event_id'], shortlist['event_id'])
             self.assertEqual(reloaded['status'], 'done')
+            review_path = Path(directory)/'reviews.jsonl'
+            self.assertEqual(consumer.flush_review_outbox(jobs, review_path)['delivered'], 1)
+            receipt = json.loads(review_path.read_text())
+            self.assertEqual(receipt['scan_id'], result['scan_id'])
+            self.assertEqual(receipt['scanner_event_id'], shortlist['event_id'])
+            self.assertEqual(consumer.flush_review_outbox(jobs, review_path)['delivered'], 0)
 
 if __name__ == '__main__':
     unittest.main()
