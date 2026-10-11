@@ -8,6 +8,7 @@ the response and annotates the queue only; it has no broker or order imports.
 from __future__ import annotations
 
 import json
+import fcntl
 import os
 import sys
 import urllib.error
@@ -65,10 +66,18 @@ def atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    encoded = json.dumps(payload, sort_keys=True, default=str, allow_nan=False) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
-    path.chmod(0o600)
+    fd = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "a", encoding="utf-8") as handle:
+        os.fchmod(handle.fileno(), 0o600)
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def validate_result(candidate: dict[str, Any], result: Any) -> dict[str, Any]:
