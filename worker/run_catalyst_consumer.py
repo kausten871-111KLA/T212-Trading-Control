@@ -59,11 +59,38 @@ class Reviewer(Protocol):
 
 
 def atomic_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write a status receipt under a stable lock with crash-safe local durability.
+
+    This is local POSIX filesystem durability, not a guarantee across network
+    mounts, hardware failure or two independently managed deployment hosts.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    tmp.chmod(0o600)
-    tmp.replace(path)
+    encoded = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False)
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(lock_fd, "a+") as lock:
+        os.fchmod(lock.fileno(), 0o600)
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            if path.is_symlink():
+                raise OSError("Status destination must not be a symlink")
+            temporary = path.with_suffix(path.suffix + "." + uuid.uuid4().hex + ".tmp")
+            try:
+                fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as output:
+                    output.write(encoded)
+                    output.flush()
+                    os.fsync(output.fileno())
+                temporary.replace(path)
+                directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+            finally:
+                temporary.unlink(missing_ok=True)
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
