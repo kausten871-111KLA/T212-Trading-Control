@@ -109,7 +109,10 @@ def evaluate(
             "reasons": ["BROKER_ENVIRONMENT_UNSAFE"],
             "metrics": {},
         }
-    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    observed = now or datetime.now(timezone.utc)
+    if observed.tzinfo is None:
+        raise RiskGateError("evaluation time must include timezone")
+    current = observed.astimezone(timezone.utc)
     try:
         broker_generated = _parse_time(str(portfolio.get("generated_at") or ""))
     except RiskGateError:
@@ -193,14 +196,20 @@ def evaluate(
     spread_pct = spread.get("pct_midpoint", spread.get("spread_pct"))
     if spread_pct is None:
         reasons.append("SPREAD_UNKNOWN")
-    elif _num(spread_pct, "spread") > _num(rules["normal_session_spread_ceiling_pct_midpoint"], "spread ceiling"):
-        reasons.append("SPREAD_LIMIT")
+    else:
+        spread_value = _num(spread_pct, "spread")
+        if spread_value < 0:
+            raise RiskGateError("spread must not be negative")
+        if spread_value > _num(rules["normal_session_spread_ceiling_pct_midpoint"], "spread ceiling"):
+            reasons.append("SPREAD_LIMIT")
 
     min_rr = _num(rules["minimum_reward_risk_to_first_target"], "minimum reward risk")
     if reward_risk < min_rr:
         reasons.append("REWARD_RISK_LIMIT")
 
     friction = proposal.get("expected_friction_pct_planned_risk")
+    if friction is not None and _num(friction, "expected friction") < 0:
+        raise RiskGateError("expected friction must not be negative")
     if friction is not None and _num(friction, "expected friction") > _num(
         rules["max_expected_friction_pct_planned_risk"], "friction limit"
     ):
@@ -216,9 +225,11 @@ def evaluate(
     current_price = proposal.get("current_reference_price")
     original_price = proposal.get("proposal_reference_price")
     reference_move_pct = None
-    if current_price is not None and original_price not in (None, 0):
+    if current_price is not None or original_price is not None:
         original = _num(original_price, "proposal_reference_price")
         current_px = _num(current_price, "current_reference_price")
+        if original <= 0 or current_px <= 0:
+            raise RiskGateError("reference prices must be positive")
         reference_move_pct = abs(current_px / original - 1.0) * 100.0
         if reference_move_pct > _num(
             rules["reprice_rescale_if_reference_price_move_pct"],

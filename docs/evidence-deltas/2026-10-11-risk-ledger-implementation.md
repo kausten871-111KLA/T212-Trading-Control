@@ -14,7 +14,7 @@ Baseline PR8 bf6ec10274652edf412bde355ea4e58791010a8a; stacked on PR9 7fea6c450e
 ## Exact acceptance commands and observed results
 ```sh
 python3 -m unittest discover -s tests -p 'test_risk*.py' -v
-# 25 methods PASS
+# 26 methods PASS
 python3 -m unittest discover -s tests -p 'test_opportunity_ledger_durability.py' -v
 # 5 methods PASS; 4 OS processes, 100 unique parseable events; immediate process-exit persistence
 python3 -m unittest discover -s tests -p 'test_scan_event_correlation.py' -v
@@ -31,9 +31,7 @@ python3 -m unittest discover -s tests -p 'test_catalyst_queue_concurrency.py' -v
 python3 -m unittest discover -s tests -p 'test_catalyst_consumer.py' -v
 # 7 unchanged existing consumer tests PASS
 ```
-Review-log append now locks/fsyncs and refuses symlinks/nonfinite JSON. Two additional tests preserve80 unique reviews across4 processes exiting immediately; existing consumer regression remains7 PASS.
-
-Total44 passing targeted/regression methods, plus1 separate known-defect reproduction. First consumer invocation from parent lacked module search path; rerun from checkout root passed. Queue replacement is fsynced, but no physical power-cut experiment or network-filesystem support claimed.
+Total42 passing targeted/regression methods, plus1 separate known-defect reproduction. First consumer invocation from parent lacked module search path; rerun from checkout root passed. Queue replacement is fsynced, but no physical power-cut experiment or network-filesystem support claimed.
 
 ## Remaining release blockers
 1. Trusted broker-account portfolio and FX producer with authenticated provenance and point-in-time loss/risk metrics; no model-supplied PASS.
@@ -41,7 +39,7 @@ Total44 passing targeted/regression methods, plus1 separate known-defect reprodu
 3. Integrate PR9 rollback guards and exercise real disposable WebUI router, permissions, response loss and concurrency. GET→POST checks are not atomic CAS; lease string is not authentication.
 4. Shared host/container cache and journal mount, key/account namespace policy, provider/rate/cache acceptance and controlled installation remain unverified.
 5. PR7 durable transactional occurrence/outbox recovery plus real-handler two-run/reload/idempotency acceptance.
-6. Queue now locks complete local-process mutation transactions, fsyncs replacement and directory; expired-lease owner fencing remains missing. Full scan→intent→broker→exit→outcome mapping remain unfinished. Event IDs do not themselves provide deduplication or power-loss directory durability.
+6. Queue now locks complete local-process mutation transactions, fsyncs replacement and directory; expired-lease owner fencing remains missing. Review log durability and full scan→intent→broker→exit→outcome mapping remain unfinished. Event IDs do not themselves provide deduplication or power-loss directory durability.
 
 ## Owner and next three actions
 Engineering sole production executor:
@@ -49,3 +47,5 @@ Engineering sole production executor:
 2. Complete negative and valid-entry mocked admission matrix plus actual disposable router rollback acceptance; retain exact command/stdout/source hashes (roughly1–3 active hours for fixtures after prerequisites; not an ETA).
 3. Continue storage/cache acceptance, while PR7 owner repairs outbox crash window separately; no dependency on deploying this containment-only gateway.
 No Katie-only action established. No deployment, broker mutation, paid call or schedule change performed.
+
+Final risk hardening rejects negative spread/friction, partial/nonpositive reference prices and timezone-naive evaluation clocks. Final26-method risk stdout retained separately; total45 targeted/regression methods plus1 unresolved-defect reproduction. Actual sprint start13:52UTC; completion timestamp recorded in Issue5 handoff.

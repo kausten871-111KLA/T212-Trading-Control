@@ -70,5 +70,13 @@ class RiskInputs(unittest.TestCase):
         self.portfolio['live_trading_enabled']=True
         self.assertIn('BROKER_ENVIRONMENT_UNSAFE',self.evaluate()['reasons'])
 
+    def test_negative_friction_spread_partial_prices_and_naive_clock_rejected(self):
+        for changes in ({'spread':{'pct_midpoint':-1}}, {'expected_friction_pct_planned_risk':-1}, {'current_reference_price':10}, {'proposal_reference_price':0,'current_reference_price':10}):
+            with self.subTest(changes=changes):
+                proposal=copy.deepcopy(self.proposal);proposal.update(changes)
+                with self.assertRaises(R.RiskGateError):self.evaluate(p=proposal)
+        with self.assertRaises(R.RiskGateError):
+            R.evaluate(self.proposal,self.portfolio,now=self.now.replace(tzinfo=None))
+
 
 if __name__=='__main__':unittest.main(verbosity=2)
