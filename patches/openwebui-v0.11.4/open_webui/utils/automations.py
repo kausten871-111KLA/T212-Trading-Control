@@ -15,6 +15,7 @@ Environment:
     CALENDAR_ALERT_LOOKAHEAD_MINUTES   – default alert window (default: 5)
 """
 
+from contextvars import ContextVar
 import asyncio
 import logging
 import os
@@ -112,8 +113,13 @@ async def scheduler_worker_loop(app) -> None:
                         batch = await Automations.claim_due(int(time.time_ns()), limit=10, db=db)
                     if batch:
                         log.info('Claimed %s due automation(s)', len(batch))
-                    for automation in batch:
-                        asyncio.create_task(execute_automation(app, automation))
+                    # Dispatch durable pending outbox rows, not just the
+                    # ephemeral claim_due return value. Survives a scheduler
+                    # process crash between COMMIT and create_task.
+                    for automation, occurrence_id in await Automations.pending_occurrences(limit=10):
+                        asyncio.create_task(
+                            execute_automation(app, automation, occurrence_id=occurrence_id)
+                        )
                 except Exception:
                     log.exception('Scheduler: automation error')
 
@@ -443,7 +449,29 @@ async def _wait_for_automation_completion(chat_id: str, message_id: str) -> None
     raise TimeoutError('Automation completion was not persisted before timeout')
 
 
-async def execute_automation(app, automation: AutomationModel) -> None:
+_CURRENT_OCCURRENCE: ContextVar[str | None] = ContextVar(
+    'automation_scheduled_occurrence', default=None
+)
+
+
+async def execute_automation(
+    app, automation: AutomationModel, occurrence_id: str | None = None
+) -> None:
+    if occurrence_id is not None:
+        # A claim is permitted only once. A crash after start is UNKNOWN and
+        # requires reconciliation before retry; do not duplicate provider work.
+        if not await Automations.start_occurrence(occurrence_id):
+            return
+        token = _CURRENT_OCCURRENCE.set(occurrence_id)
+        try:
+            await _execute_automation_with_chat_lock(app, automation)
+        finally:
+            _CURRENT_OCCURRENCE.reset(token)
+        return
+    await _execute_automation_with_chat_lock(app, automation)
+
+
+async def _execute_automation_with_chat_lock(app, automation: AutomationModel) -> None:
     target = automation.data.get('target') or {}
     chat_id = target.get('chat_id') if target.get('type', 'chat') == 'chat' else None
     if not chat_id:
@@ -802,4 +830,12 @@ async def _record_run(
 ):
     """Insert a run record into automation_run."""
     async with get_async_db() as db:
-        await AutomationRuns.insert(automation_id, status, chat_id=chat_id, error=error, db=db)
+        occurrence_id = _CURRENT_OCCURRENCE.get()
+        if occurrence_id is not None:
+            updated = await AutomationRuns.finish_occurrence(
+                occurrence_id, status, chat_id=chat_id, error=error, db=db,
+            )
+            if not updated:
+                raise RuntimeError('Scheduled occurrence was not STARTED; refusing false completion')
+        else:
+            await AutomationRuns.insert(automation_id, status, chat_id=chat_id, error=error, db=db)

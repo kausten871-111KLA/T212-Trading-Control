@@ -45,7 +45,7 @@ class AutomationRun(Base):
     id = Column(Text, primary_key=True)
     automation_id = Column(Text, nullable=False)
     chat_id = Column(Text, nullable=True)
-    status = Column(Text, nullable=False)  # success | error
+    status = Column(Text, nullable=False)  # pending | started | success | error
     error = Column(Text, nullable=True)
     created_at = Column(BigInteger, nullable=False)
 
@@ -336,6 +336,15 @@ class AutomationTable:
                 except RecurrenceEvaluationTimeout:
                     log.warning('Skipping automation %s: recurrence evaluation timed out', row.id)
                     continue
+                # Persist an execution outbox row in the SAME transaction as
+                # advancing next_run_at. A crash before create_task is recoverable.
+                due_ns = int(row.next_run_at)
+                db.add(AutomationRun(
+                    id=f'scheduled:{row.id}:{due_ns}',
+                    automation_id=row.id,
+                    status='pending',
+                    created_at=now_ns,
+                ))
                 row.last_run_at = now_ns
                 row.next_run_at = next_run_at
                 claimed.append(row)
@@ -345,12 +354,70 @@ class AutomationTable:
             return [AutomationModel.model_validate(r) for r in claimed]
 
 
+    async def pending_occurrences(
+        self, limit: int = 10, db: Optional[AsyncSession] = None
+    ) -> list[tuple[AutomationModel, str]]:
+        """List committed, not-yet-started occurrences; never replay UNKNOWN."""
+        async with get_async_db_context(db) as db:
+            result = await db.execute(
+                select(AutomationRun, Automation)
+                .join(Automation, AutomationRun.automation_id == Automation.id)
+                .where(AutomationRun.status == 'pending', Automation.is_active == True)
+                .order_by(AutomationRun.created_at, AutomationRun.id)
+                .limit(limit)
+            )
+            return [
+                (AutomationModel.model_validate(automation), occurrence.id)
+                for occurrence, automation in result.all()
+            ]
+
+    async def start_occurrence(
+        self, occurrence_id: str, db: Optional[AsyncSession] = None
+    ) -> bool:
+        """Atomically fence concurrent workers before any provider invocation."""
+        async with get_async_db_context(db) as db:
+            result = await db.execute(
+                update(AutomationRun)
+                .where(AutomationRun.id == occurrence_id, AutomationRun.status == 'pending')
+                .values(status='started')
+            )
+            await db.commit()
+            return result.rowcount == 1
+
+    async def unresolved_occurrences(
+        self, before_ns: int, limit: int = 100, db: Optional[AsyncSession] = None
+    ) -> list[AutomationRunModel]:
+        """Expose potentially executed work for reconciliation, not blind retry."""
+        async with get_async_db_context(db) as db:
+            result = await db.execute(
+                select(AutomationRun)
+                .where(AutomationRun.status == 'started', AutomationRun.created_at < before_ns)
+                .order_by(AutomationRun.created_at)
+                .limit(limit)
+            )
+            return [AutomationRunModel.model_validate(row) for row in result.scalars().all()]
+
 ####################
 # AutomationRunTable
 ####################
 
 
 class AutomationRunTable:
+    async def finish_occurrence(
+        self, occurrence_id: str, status: str, chat_id: Optional[str] = None,
+        error: Optional[str] = None, db: Optional[AsyncSession] = None,
+    ) -> bool:
+        if status not in ('success', 'error'):
+            raise ValueError('Occurrence can only finish with terminal status')
+        async with get_async_db_context(db) as db:
+            result = await db.execute(
+                update(AutomationRun)
+                .where(AutomationRun.id == occurrence_id, AutomationRun.status == 'started')
+                .values(status=status, chat_id=chat_id, error=error)
+            )
+            await db.commit()
+            return result.rowcount == 1
+
     async def insert(
         self,
         automation_id: str,
