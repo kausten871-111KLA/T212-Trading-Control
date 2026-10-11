@@ -1,0 +1,58 @@
+# 50-action progress overlay — 11 October 2026
+
+Preserves every original ID, owner and dependency. Partial code/tests do not complete parent acceptance. This is a scoped overlay, not a new master register. No current58/92 owner crosswalk supplied; totals below apply only to these50 rows.
+
+| ID | Status | Original action | Owner | Dependencies | Evidence / next requirement |
+|---|---|---|---|---|---|
+| A01 | 🔄 IN PROGRESS | Obtain named Engineering owner ACK, exclusive code writer lease and active Work execution target | Work + Engineering | PR #8 baseline | Dedicated isolated branch used; production owner execution ACK not established |
+| A02 | 🔄 IN PROGRESS | Freeze PR #8 source baseline and preserve 195-test logs for regression comparison | Engineering | 1 | PR8 source SHA fixed; old195 raw logs not recollected |
+| A03 | 🔄 IN PROGRESS | Correct rollout runbook host loopback port and make risk checks PRE-APPLY | Engineering | 2 | Runbook safety gates corrected; current port readback not performed |
+| A04 | 🔄 IN PROGRESS | Specify typed trade proposal and immutable decision/intent IDs for all new BUY types | Engineering + DeepSeek | 1 | Pure immutable intent/account/payload/FX binder implemented; producer contract pending |
+| A05 | ⚠️ BLOCKED / HUMAN ACTION REQUIRED | Collect/validate fresh broker-authoritative portfolio snapshot before risk-increasing calls | Engineering + DeepSeek | 4 | Trusted broker snapshot/FX producer and provenance unavailable in this isolated execution; no Katie-only action established |
+| A06 | 🔄 IN PROGRESS | Wire risk evaluator into actual MARKET and STOP/LIMIT/STOP_LIMIT order mutation boundary | Engineering | 4,5 | New BUY containment at real mutation boundary; positive admission not connected |
+| A07 | 🔄 IN PROGRESS | Run mandatory negative risk matrix (missing/stale, cash, exposure, loss, LIVE, invalid data) | Engineering | 6 | 25 focused risk methods pass; integrated positive/negative admission matrix remains |
+| A08 | 🔄 IN PROGRESS | Design separately verified risk-reducing SELL/CLOSE exception and sell reservation limits | Engineering + DeepSeek | 6 | Holdings-verified exit and over-reservation focused fixtures pass; broader races remain |
+| A09 | ⏳ QUEUED | Verify cancellations, pending/partial/fill and races cannot bypass risk/order state | Engineering | 6,8 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A10 | 🔄 IN PROGRESS | Publish narrow PR #8 risk patch and reviewer acceptance receipt | Engineering / independent QA | 3–9 | Isolated proposed code and tests delivered; shared PR8 integration pending |
+| A11 | ⏳ QUEUED | Choose a single persistent journal directory and account namespace lifecycle | Engineering | 10 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A12 | 🔄 IN PROGRESS | Test durable pre-POST intent commit and same-ID replay across process restarts | Engineering | 11 | Response-lost SELL survives gateway re-instantiation without another POST; full process crash matrix pending |
+| A13 | ⏳ QUEUED | Implement broker-history/position reconciliation for UNKNOWN without order ID | Engineering + DeepSeek | 12 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A14 | ⏳ QUEUED | Exercise cross-process lock, concurrent orders and sell-reservation race fixtures | Engineering | 11–13 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A15 | ⏳ QUEUED | Exercise partial fill / cancelled / rejected / expired transitions and journal integrity | Engineering | 14 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A16 | ⏳ QUEUED | Validate account/order pacing including 429, Retry-After and non-idempotent POST handling | Engineering | 12 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A17 | ⏳ QUEUED | Prove effective risk-policy consumer preserves all non-count controls | Engineering + Site Configurator | 10 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A18 | 🔄 IN PROGRESS | Integrate Executive Orchestra proposed rollback lease/grant/metadata guard patch | Engineering | 10 | PR9 committed guard repair8 tests; Engineering integration pending |
+| A19 | ⚠️ BLOCKED / HUMAN ACTION REQUIRED | Run apply/rollback/crash/response-lost tests against isolated real WebUI API/router | Engineering | 18 | Real disposable WebUI router/dependencies not accessible here; no Katie-only action established |
+| A20 | ⏳ QUEUED | Tag release candidate with reproducible signed/hash evidence and issue receipt | Engineering | 11–19 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A21 | ⏳ QUEUED | Select shared host/container storage location; avoid competing cache trees | Engineering | 20 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A22 | ⏳ QUEUED | Provision host directory/volume, UID/GID, backup and single-host lock scope | Engineering | 21 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A23 | ⏳ QUEUED | Provision cache-worker environment file securely without logging credentials | Engineering | 22 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A24 | ⏳ QUEUED | Validate metadata GET rate budget, provider Retry-After and 50-second cooldown | Engineering | 23 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A25 | ⏳ QUEUED | Run 50 sequential and 10 concurrent cache-only symbol lookup fixtures | Engineering | 22–24 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A26 | ⏳ QUEUED | Validate ticker, currency, working schedule and exchange/venue disambiguation | Engineering + DeepSeek | 25 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A27 | ⏳ QUEUED | Verify fresh/stale cache TTL, diff baseline, malformed-disk recovery and age | Engineering | 25 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A28 | ⏳ QUEUED | Install/start cache-refresh service and timer only after storage acceptance | Engineering | 22–27 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A29 | ⏳ QUEUED | Collect bounded no-secret worker logs and reconcile host vs WebUI state | Engineering | 28 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A30 | ⏳ QUEUED | Complete timer/service rollback and state-retention drill | Engineering | 28,29 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A31 | ⚠️ BLOCKED / HUMAN ACTION REQUIRED | Hold production pre-apply GO/NO-GO with risk, state, rollback and owners | Engineering + DeepSeek | 10,20,30 | Risk admission, state and rollout acceptance incomplete; no Katie-only action established |
+| A32 | ⏳ QUEUED | Create cold backup of WebUI data and newly selected journal/cache state | Engineering | 31 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A33 | ⏳ QUEUED | Rerun guarded preflight on current host port and expected installed source hash | Engineering | 32 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A34 | ⏳ QUEUED | Verify tool metadata/grants, model binding, function specs and real permissions | Site Configurator + Engineering | 33 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A35 | ⚠️ BLOCKED / HUMAN ACTION REQUIRED | Apply reviewed candidate to Workspace Tool only under exclusive lease | Engineering | 31–34 | Production installation not authorized by this staging sprint; no Katie-only action established |
+| A36 | ⏳ QUEUED | Verify installed method schemas and preserve MARKET/fractional baseline | Engineering + Site Configurator | 35 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A37 | ⏳ QUEUED | Perform cache-only read via actual attached DeepSeek tool with permissions | Site Configurator + DeepSeek | 36 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A38 | ⚠️ BLOCKED / HUMAN ACTION REQUIRED | Prove installed risk enforcement via controlled zero-POST negative path | Engineering + independent QA | 36 | Candidate not installed; runtime negative acceptance unavailable; no Katie-only action established |
+| A39 | ⏳ QUEUED | Coordinate naturally occurring authorised DEMO broker-state lifecycle checks | DeepSeek + Engineering | 36–38 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A40 | ⏳ QUEUED | Close release receipt and rollback fallback if any acceptance step fails | Engineering + QA | 35–39 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A41 | 🔄 IN PROGRESS | Reconcile PR #7 current base with v0.11.4 and preserve prior test evidence | Engineering | 40 or parallel isolated | PR7 exact source claim function retained in fixture; v0.11.4 rebase not implemented |
+| A42 | ⚠️ BLOCKED / HUMAN ACTION REQUIRED | Test real completion handler two-run append to identical persisted chat | Engineering | 41 | Real completion-handler/provider environment not exercised; no Katie-only action established |
+| A43 | 🔄 IN PROGRESS | Test manual edit overlap, mid-append crash, replay and idempotency | Engineering | 42 | Lost occurrence reproduced; durable outbox repair outstanding |
+| A44 | ⏳ QUEUED | Choose channel/reporting architecture based on measured cost, not assumptions | Site Configurator + DeepSeek | 42 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A45 | 🔄 IN PROGRESS | Complete canonical event ledger producer-store-consumer correlation mapping | Engineering + Site Configurator | 43 | Durable ledger IDs, queue lock/fsync and scan→review correlation implemented; order/outcome links pending |
+| A46 | ⏳ QUEUED | Reconcile DeepSeek OPEN/MIDDAY/CLOSE runs with broker actions and exceptions | DeepSeek | 37 or existing legacy tools | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A47 | ⏳ QUEUED | Validate actual market research funnel, dated inputs and missed-green reviews | DeepSeek + Engineering | 45,46 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A48 | 🔄 IN PROGRESS | Refresh outdated Executive Orchestra and Engineering handoff directives | Orchestra + user review | 41–47 | Combined handoff removes outdated version/two-job assumptions without changing schedules |
+| A49 | ⏳ QUEUED | Validate original 58 rows and 92-ID master register without duplicating IDs | Orchestra + Site Configurator | 45–48 | No new execution evidence in this sprint; preserve original dependency and acceptance |
+| A50 | 🔄 IN PROGRESS | Publish final release dossier, KPI ledger and next sprint decision | Work + Engineering + Orchestra | 1–49 applicable gates | This scoped receipt delivered; full release dossier blocked by unfinished acceptance |
+
+Totals: COMPLETE0; IN PROGRESS15; QUEUED29; BLOCKED6. These are full action acceptance statuses; narrower test/code deliverables are completed in the sprint receipt. Highest-priority missing dependency: trusted broker-backed risk producer/admission, A05→A06. Neither a BUY containment patch nor a pure binder completes that dependency.

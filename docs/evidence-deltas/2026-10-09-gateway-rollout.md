@@ -8,6 +8,12 @@ Model trading-operations--deepseek attaches trading_212_demo_gateway_tool and ma
 
 The cache timer is not installed (systemctl is-enabled: not-found; is-active: inactive). /home/katie/t212-scanner and /var/lib/t212-scanner do not exist. The container has only its existing data volume at /app/backend/data, backed by /var/lib/docker/volumes/open-webui_open-webui-data/_data. Do not interpret repository deployment paths as running infrastructure.
 
+## Mandatory pre-apply gates
+
+STOP: this containment candidate blocks all new BUY orders. It must not be installed as a trading-ready release. Before ANY --apply: accept trusted broker snapshot/account/FX producer, exact proposal-to-payload binding, retained risk evaluator and concurrent reservation handling; pass all zero-POST negative tests and a reviewed valid BUY path; accept rollback owner/identity guards against actual isolated WebUI router; verify shared journal/cache state, model grants, fresh cold backup and exclusive Engineering ownership. Repository/mock evidence alone does not satisfy installed or broker acceptance.
+
+Risk checks are PRE-APPLY gates, not a post-install discovery task. PR7 isolated acceptance remains independent.
+
 ## Rollout steps
 
 1. Engineering acknowledges exclusive production ownership and verifies no conflicting rollout or broker workflow. Review the latest PR commit and its acceptance receipt. Back up the production data volume using the existing cold-backup procedure.
@@ -17,10 +23,10 @@ The cache timer is not installed (systemctl is-enabled: not-found; is-active: in
 5. Use scripts/rollout_t212_gateway.py with WEBUI_ADMIN_TOKEN supplied securely. It uses the official WebUI update API and preserves metadata/access grants, refuses an unexpected source hash, defaults to read-only preflight, and saves a private exclusive backup before applying. Run on the server using a verified loopback WebUI URL. The script's source check is not an atomic server-side CAS; exclusive ownership remains required.
 
 ```bash
-python3 scripts/rollout_t212_gateway.py --url http://127.0.0.1:8080 --expected-sha 4acf6583dd6b41630282de972b5ed20a47705bce477dc2c3a1bd13311712adbe
+python3 scripts/rollout_t212_gateway.py --url http://127.0.0.1:3000 --expected-sha 4acf6583dd6b41630282de972b5ed20a47705bce477dc2c3a1bd13311712adbe
 ```
 
-After preflight and ownership confirmation, add --apply --backup /a/private/new-backup.json --owner-lease <actual-owner-reference>. Verify the URL/port before use. Rollback uses --rollback <that-backup> --owner-lease <actual-owner-reference> and refuses to overwrite intervening source changes. A lost update response is reconciled with GET; it is not retried automatically. A failed verification remains a deployment exception and requires owner review.
+Only after ALL mandatory pre-apply gates and ownership confirmation, add --apply --backup /a/private/new-backup.json --owner-lease <actual-owner-reference>. Verify the URL/port before use. Rollback uses --rollback <that-backup> --owner-lease <actual-owner-reference> and refuses to overwrite intervening source changes. A lost update response is reconciled with GET; it is not retried automatically. A failed verification remains a deployment exception and requires owner review.
 
 6. Verify the installed source hash, method schemas, existing model binding, real user's tool permissions and a cache-only FIND through the actual model. The isolated tests use a synthetic admin; they do not prove live user's access or provider invocation. Expose new typed methods through the Workspace Tool. The generated manual Pipe is a separate interface: rebuild with scripts/build_t212_demo_pipe.py before any Pipe import, and verify its separate binding/permissions.
 7. Update callers to stable explicit intent_id values. MARKET/CLOSE remain callable without them for compatibility, but the derived key permanently blocks repeated identical commands across restart. A distinct approved decision must use a new explicit ID; never use a new ID to retry UNKNOWN.
@@ -30,3 +36,4 @@ After preflight and ownership confirmation, add --apply --backup /a/private/new-
 ## Known boundaries
 
 UNKNOWN without broker ID requires manual broker history/position reconciliation. API-key identity and filesystem locks are single shared-host assumptions. Successful metadata snapshots enforce a shared 50-second cooldown even for forced refresh; retries honour provider waits and metadata cooldowns. There is no durable cross-key/provider-wide attempt budget across failed separate refresh invocations. Venue aliases need authoritative mapping; workingScheduleId is not proof of exchange identity. Persisted order identity does not implement the complete portfolio risk policy by itself. PR #7 persistent-chat acceptance remains separate.
+

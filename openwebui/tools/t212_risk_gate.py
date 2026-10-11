@@ -81,12 +81,19 @@ def evaluate(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     config = dict(controls or load_controls())
+    if config.get("environment") != "DEMO":
+        raise RiskGateError("risk controls must remain DEMO")
     rules = config.get("controls") or {}
     authority = config.get("portfolio_authority") or {}
 
     safety = proposal.get("safety") or {}
     if safety.get("environment") != "DEMO" or safety.get("live_trading") is not False:
         raise RiskGateError("proposal violates DEMO safety")
+    if str(proposal.get("side", "BUY")).upper() != "BUY":
+        raise RiskGateError("entry risk gate supports long BUY only; exits require holdings verification")
+    for flag in ("shorting", "leverage", "cfds", "averaging_down", "martingale", "revenge_or_loss_chasing"):
+        if proposal.get(flag, False) is not False:
+            raise RiskGateError("prohibited strategy flag: " + flag)
 
     if authority.get("broker_truth_authoritative") is not True:
         raise RiskGateError("broker-truth authority must be enabled")
@@ -111,7 +118,9 @@ def evaluate(
             "reasons": ["BROKER_STATE_UNVERIFIED"],
             "metrics": {},
         }
-    broker_age_seconds = max(0.0, (current - broker_generated).total_seconds())
+    broker_age_seconds = (current - broker_generated).total_seconds()
+    if broker_age_seconds < 0:
+        return {"decision": "REJECT", "reasons": ["BROKER_STATE_FUTURE"], "metrics": {}}
     if broker_age_seconds > _num(
         rules["broker_snapshot_validity_seconds"], "broker snapshot validity"
     ):
@@ -135,7 +144,10 @@ def evaluate(
     if min(entry_low, entry_high, stop, quantity, exposure) <= 0 or entry_high < entry_low:
         raise RiskGateError("proposal price/quantity/exposure invalid")
 
-    reference_entry = (entry_low + entry_high) / 2.0
+    # Conservative sizing uses the worst allowed entry, not the range midpoint.
+    reference_entry = entry_high
+    if exposure + 1e-9 < entry_high * quantity:
+        raise RiskGateError("intended_exposure understates quantity times maximum entry")
     per_share_risk = max(0.0, reference_entry - stop)
     planned_loss = per_share_risk * quantity
 
@@ -148,10 +160,18 @@ def evaluate(
     max_position = _lower_of(equity, rules["position_value"])
     max_aggregate = _lower_of(equity, rules["aggregate_open_risk"])
 
-    pending = _num(portfolio.get("pending_commitments", 0), "pending_commitments")
-    reserved = _num(portfolio.get("candidate_reservations", 0), "candidate_reservations")
+    required_state = ("pending_commitments", "candidate_reservations", "open_position_count", "aggregate_open_risk", "daily_loss", "starting_daily_equity", "weekly_loss", "starting_weekly_equity", "high_water_equity")
+    for field in required_state:
+        number = _num(portfolio.get(field), "portfolio." + field)
+        if number < 0:
+            raise RiskGateError("portfolio." + field + " must not be negative")
+    pending = _num(portfolio["pending_commitments"], "pending_commitments")
+    reserved = _num(portfolio["candidate_reservations"], "candidate_reservations")
     spendable_cash = max(0.0, cash - pending - reserved)
-    open_positions = int(portfolio.get("open_position_count", 0) or 0)
+    count_value = _num(portfolio["open_position_count"], "open_position_count")
+    if not count_value.is_integer():
+        raise RiskGateError("open_position_count must be an integer")
+    open_positions = int(count_value)
     aggregate_risk = _num(portfolio.get("aggregate_open_risk", 0), "aggregate_open_risk")
 
     reasons: list[str] = []
@@ -187,7 +207,9 @@ def evaluate(
         reasons.append("FRICTION_LIMIT")
 
     generated = _parse_time(str(proposal.get("generated_at") or ""))
-    age_seconds = max(0.0, (current - generated).total_seconds())
+    age_seconds = (current - generated).total_seconds()
+    if age_seconds < 0:
+        reasons.append("PROPOSAL_FUTURE")
     if age_seconds > _num(rules["proposal_validity_seconds"], "proposal validity"):
         reasons.append("PROPOSAL_STALE")
 
@@ -254,3 +276,4 @@ def evaluate(
             "order_mutation": False,
         },
     }
+

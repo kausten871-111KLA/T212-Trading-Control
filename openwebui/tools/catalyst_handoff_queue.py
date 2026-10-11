@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import fcntl
+from functools import wraps
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -10,6 +13,25 @@ from typing import Any
 
 
 FINAL_STATES = {"done", "failed"}
+
+
+def serialized_mutation(method):
+    """Lock the complete read/check/rewrite transaction across local processes."""
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "a") as lock:
+            os.fchmod(lock.fileno(), 0o600)
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                if self.path.is_symlink():
+                    raise ValueError("Queue destination must not be a symlink")
+                return method(self, *args, **kwargs)
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    return guarded
 
 
 class CatalystHandoffQueue:
@@ -42,19 +64,29 @@ class CatalystHandoffQueue:
 
     def _rewrite(self, rows: list[dict[str, Any]]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        tmp.write_text(
-            "".join(json.dumps(row, default=str, sort_keys=True) + "\n" for row in rows),
-            encoding="utf-8",
-        )
-        tmp.chmod(0o600)
-        tmp.replace(self.path)
+        tmp = self.path.with_suffix(self.path.suffix + "." + uuid.uuid4().hex + ".tmp")
+        encoded = "".join(json.dumps(row, sort_keys=True, allow_nan=False, default=str) + "\n" for row in rows)
+        try:
+            fd = os.open(tmp, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(encoded)
+                handle.flush()
+                os.fsync(handle.fileno())
+            tmp.replace(self.path)
+            directory = os.open(self.path.parent, os.O_DIRECTORY | os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+        finally:
+            tmp.unlink(missing_ok=True)
 
     def _dedup_key(self, candidate: dict[str, Any], now: datetime | None = None) -> str:
         symbol = str(candidate.get("symbol") or candidate.get("t212_ticker") or "").upper()
         tier = (candidate.get("tier_state") or {}).get("current_tier")
         return f"{self._today(now)}|{symbol}|{tier}"
 
+    @serialized_mutation
     def enqueue(self, candidate: dict[str, Any], now: datetime | None = None) -> dict[str, Any]:
         observed = self._now(now)
         rows = self._read()
@@ -120,6 +152,7 @@ class CatalystHandoffQueue:
         rows.sort(key=lambda row: str(row.get("completed_at") or row.get("queued_at") or ""), reverse=True)
         return rows[: max(1, int(limit))]
 
+    @serialized_mutation
     def claim(
         self,
         event_id: str,
@@ -147,6 +180,7 @@ class CatalystHandoffQueue:
             self._rewrite(rows)
         return changed
 
+    @serialized_mutation
     def acknowledge(
         self,
         event_id: str,
@@ -173,6 +207,7 @@ class CatalystHandoffQueue:
             self._rewrite(rows)
         return changed
 
+    @serialized_mutation
     def retry(
         self,
         event_id: str,
@@ -213,3 +248,4 @@ class CatalystHandoffQueue:
             "done": sum(row.get("status") == "done" for row in today_rows),
             "failed": sum(row.get("status") == "failed" for row in today_rows),
         }
+

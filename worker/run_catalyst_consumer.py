@@ -162,7 +162,7 @@ def consume(
         try:
             result = validate_result(claimed["candidate"], reviewer.review(claimed["candidate"]))
             queue.acknowledge(claimed["id"], result=result, now=observed)
-            completed.append({"event_id": claimed["id"], "result": result})
+            completed.append({"event_id": claimed["id"], "scan_id": claimed["candidate"].get("scan_id"), "scanner_event_id": claimed["candidate"].get("scanner_event_id"), "result": result})
         except Exception as exc:
             updated = queue.retry(
                 claimed["id"],
@@ -235,3 +235,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
