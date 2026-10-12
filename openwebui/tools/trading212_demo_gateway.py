@@ -2,20 +2,129 @@
 title: Trading 212 DEMO Gateway
 author: Katie / OpenAI
 description: Single server-side Trading 212 DEMO broker toolkit for DeepSeek/Open WebUI agents.
-version: 0.2.0
+version: 0.2.1-cache-candidate
 """
 
 import os
 import json
 import time
 import httpx
+import sqlite3
+import hashlib
+import uuid
+import asyncio
+import re
+from contextlib import closing
 
+
+
+# Cache ONLY broker instrument metadata; never account/position/order state.
+class _MetadataCache:
+    TTL = 600
+    MIN_GAP = 55  # Broker publishes a 1 request / 50s catalogue budget.
+    MAX_STALE = 86400
+
+    def __init__(self, path=None):
+        self.path = os.path.abspath(path or os.getenv(
+            "T212_LEGACY_METADATA_CACHE_PATH",
+            "/app/backend/data/t212-legacy-metadata.sqlite3"))
+
+    def _connect(self):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        fd = os.open(self.path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        os.close(fd)
+        con = sqlite3.connect(self.path, timeout=10)
+        con.execute("""CREATE TABLE IF NOT EXISTS metadata (
+            scope TEXT PRIMARY KEY, payload TEXT, fetched REAL DEFAULT 0,
+            earliest REAL DEFAULT 0, owner TEXT, lease_until REAL DEFAULT 0)""")
+        con.execute("""CREATE TABLE IF NOT EXISTS read_budget (
+            scope TEXT NOT NULL, route TEXT NOT NULL,
+            earliest REAL NOT NULL DEFAULT 0, PRIMARY KEY(scope,route))""")
+        con.commit()
+        return con
+
+    def reserve(self, scope, now):
+        """SQLite serialisation prevents duplicate catalogue GETs across processes."""
+        with closing(self._connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("INSERT OR IGNORE INTO metadata(scope) VALUES (?)",(scope,))
+            raw, fetched, earliest, owner, lease_until = db.execute(
+                "SELECT payload,fetched,earliest,owner,lease_until FROM metadata WHERE scope=?",
+                (scope,)).fetchone()
+            data = json.loads(raw) if raw is not None else None
+            if data is not None and (not isinstance(data,list) or not all(isinstance(x,dict) for x in data)):
+                raise ValueError("Damaged metadata cache must be preserved")
+            age = max(0,now-fetched) if fetched else None
+            if age is not None and age <= self.TTL:
+                return "fresh",data,age,None,0
+            if now < earliest or (owner and now < lease_until):
+                wait=max(0,earliest-now,lease_until-now if owner else 0)
+                return "waiting",data,age,None,wait
+            lease=uuid.uuid4().hex
+            db.execute("UPDATE metadata SET owner=?,lease_until=?,earliest=? WHERE scope=?",
+                       (lease,now+45,now+self.MIN_GAP,scope))
+            return "fetch",data,age,lease,0
+
+    def complete(self,scope,lease,result=None,extra_delay=0):
+        now=time.time()
+        with closing(self._connect()) as db,db:
+            db.execute("BEGIN IMMEDIATE")
+            current=db.execute("SELECT owner FROM metadata WHERE scope=?",(scope,)).fetchone()
+            if not current or current[0]!=lease:
+                return False
+            if result is not None:
+                if not isinstance(result,list) or not result or not all(
+                    isinstance(x,dict) and isinstance(x.get("ticker"),str) and x["ticker"]
+                    for x in result
+                ):
+                    raise ValueError("Invalid catalogue; previous snapshot preserved")
+                db.execute("UPDATE metadata SET payload=?,fetched=?,owner=NULL,lease_until=0,"
+                           "earliest=MAX(earliest,?) WHERE scope=?",
+                           (json.dumps(result,allow_nan=False),now,now+extra_delay,scope))
+            else:
+                db.execute("UPDATE metadata SET owner=NULL,lease_until=0,"
+                           "earliest=MAX(earliest,?) WHERE scope=?",
+                           (now+extra_delay,scope))
+            return True
+
+    def reserve_read(self,scope,route,gap,now):
+        """Pace broker-truth reads; DO NOT cache account/position/order responses."""
+        with closing(self._connect()) as db,db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("INSERT OR IGNORE INTO read_budget(scope,route) VALUES (?,?)",(scope,route))
+            earliest=db.execute("SELECT earliest FROM read_budget WHERE scope=? AND route=?",
+                                (scope,route)).fetchone()[0]
+            wait=max(0,earliest-now)
+            if wait>5:
+                return wait,False
+            db.execute("UPDATE read_budget SET earliest=? WHERE scope=? AND route=?",
+                       (max(now,earliest)+gap,scope,route))
+            return wait,True
+
+    def defer_read(self,scope,route,seconds):
+        with closing(self._connect()) as db,db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("INSERT OR IGNORE INTO read_budget(scope,route) VALUES (?,?)",(scope,route))
+            db.execute("UPDATE read_budget SET earliest=MAX(earliest,?) WHERE scope=? AND route=?",
+                       (time.time()+max(0,seconds),scope,route))
+
+    @staticmethod
+    def retry_delay(error):
+        match=re.search(r"Retry-After:\s*(\d+(?:\.\d+)?)",error or "",re.I)
+        return max(55,min(3600,float(match.group(1)))) if match else 55
 
 class Tools:
     def __init__(self):
         self.base_url = "https://demo.trading212.com/api/v0"
         self.last_submission = None
         self.last_submission_time = 0.0
+        self._metadata_cache = _MetadataCache()
+
+    def _broker_scope(self, key):
+        # T212 budgets apply per broker account, not per API key. Where multiple
+        # keys share one account, configure the same non-secret account scope.
+        account=os.getenv("T212_DEMO_ACCOUNT_SCOPE","").strip()
+        return hashlib.sha256((self.base_url+":"+(account or key)).encode()).hexdigest()
 
     def _credentials(self):
         return (
@@ -33,6 +142,23 @@ class Tools:
 
         if not key or not secret:
             return None, "T212 DEMO credentials are not available to Open WebUI."
+
+        # Fresh broker truth: account reads are paced, never cached.
+        read_gaps={"/equity/account/summary":5.5,
+                   "/equity/positions":1.25,
+                   "/equity/orders":5.5}
+        budget_scope=None
+        if method == "GET" and path in read_gaps:
+            budget_scope=self._broker_scope(key)
+            try:
+                wait,reserved=await asyncio.to_thread(
+                    self._metadata_cache.reserve_read,budget_scope,path,read_gaps[path],time.time())
+                if not reserved:
+                    return None, f"T212 DEMO GET paced; retry after {wait:.1f}s. No stale broker state returned."
+                if wait:
+                    await asyncio.sleep(wait)
+            except (OSError,sqlite3.Error,ValueError) as exc:
+                return None, f"T212 DEMO read budget unavailable ({type(exc).__name__}); no GET attempted."
 
         try:
             async with httpx.AsyncClient(
@@ -55,7 +181,19 @@ class Tools:
                     data = response.text
 
                 if response.is_error:
-                    return None, f"T212 DEMO API error {response.status_code}: {data}"
+                    header=response.headers.get("Retry-After","").strip()
+                    delay=header if re.fullmatch(r"\d+(?:\.\d+)?",header) else ""
+                    reset=response.headers.get("x-ratelimit-reset","").strip()
+                    if not delay and re.fullmatch(r"\d+(?:\.\d+)?",reset):
+                        delay=str(max(0,float(reset)-time.time()))
+                    suffix=f" (Retry-After: {delay})" if delay else ""
+                    if response.status_code == 429 and budget_scope:
+                        try:
+                            await asyncio.to_thread(self._metadata_cache.defer_read,
+                                budget_scope,path,_MetadataCache.retry_delay(suffix))
+                        except (OSError,sqlite3.Error,ValueError):
+                            return None,"Broker GET throttled and cooldown persistence failed; stop repeated reads."
+                    return None, f"T212 DEMO API error {response.status_code}{suffix}: {data}"
 
                 return data, None
 
@@ -89,7 +227,7 @@ class Tools:
         return self._show(
             {
                 "environment": "DEMO",
-                "gatewayVersion": "0.2.0",
+                "gatewayVersion": "0.2.1-cache-candidate",
                 "account": account,
                 "openPositionCount": len(positions),
                 "positions": positions,
@@ -111,10 +249,38 @@ class Tools:
         if not query:
             return "Instrument query is empty."
 
-        data, error = await self._request("GET", "/equity/metadata/instruments")
-        if error:
-            return error
-
+        # Hash the credential key only to partition cache by DEMO API scope.
+        key,secret=self._credentials()
+        if not key or not secret:
+            return "T212 DEMO credentials are not available to Open WebUI."
+        scope=self._broker_scope(key)
+        try:
+            action,data,age,owner,wait=await asyncio.to_thread(
+                self._metadata_cache.reserve,scope,time.time())
+        except (OSError,sqlite3.Error,ValueError) as exc:
+            return f"Metadata cache unavailable ({type(exc).__name__}); no broker GET attempted."
+        stale=action=="waiting"
+        if action=="fetch":
+            incoming,error=await self._request("GET","/equity/metadata/instruments")
+            try:
+                valid=await asyncio.to_thread(
+                    self._metadata_cache.complete,scope,owner,
+                    incoming if error is None else None,
+                    extra_delay=self._metadata_cache.retry_delay(error)
+                    if error and "429" in error else 0)
+            except (OSError,sqlite3.Error,ValueError) as exc:
+                return f"Metadata persistence failed ({type(exc).__name__}); no verified result."
+            if not valid:
+                return "Metadata refresh lost its lease; retry, do not guess tickers."
+            if error:
+                stale=True
+            else:
+                data,age=incoming,0
+        if stale and (age is None or age>self._metadata_cache.MAX_STALE or not data):
+            return ("Instrument catalogue unavailable or refresh budget busy; "
+                    f"wait approximately {int(wait)} seconds. Do not guess broker tickers.")
+        if not isinstance(data,list):
+            return "Invalid instrument metadata; broker ticker unverified."
         matches = []
 
         for inst in data if isinstance(data, list) else []:
@@ -136,9 +302,12 @@ class Tools:
                     }
                 )
 
+        if stale:
+            return self._show({"status":"STALE_RESEARCH_ONLY",
+                "notExecutionVerified":True,"cacheAgeSeconds":int(age),
+                "retryAfterSeconds":int(wait),"matches":matches[:10]})
         if not matches:
             return f"No T212 DEMO instrument matched '{query}'."
-
         return self._show(matches[:10])
 
     async def recent_order_history(self, limit: int = 20) -> str:
@@ -207,7 +376,7 @@ class Tools:
         return self._show(
             {
                 "environment": "DEMO",
-                "gatewayVersion": "0.2.0",
+                "gatewayVersion": "0.2.1-cache-candidate",
                 "account": account,
                 "openPositionCount": len(positions),
                 "positions": positions,
