@@ -110,6 +110,7 @@ def _persist_review(path: Path, payload: dict[str, Any], *, idempotent: bool) ->
             if path.is_symlink():
                 raise OSError("Review destination must not be a symlink")
             original = path.read_text(encoding="utf-8") if path.exists() else ""
+            matched = False
             for line in original.splitlines():
                 if not line.strip():
                     continue
@@ -118,22 +119,27 @@ def _persist_review(path: Path, payload: dict[str, Any], *, idempotent: bool) ->
                     raise ValueError("Invalid review log record")
                 if idempotent and (row.get("receipt_id") == payload["receipt_id"] or row.get("event_id") == payload["event_id"]):
                     fields = ("event_id", "scan_id", "scanner_event_id", "result")
-                    if any(row.get(field) != payload.get(field) for field in fields):
-                        raise ValueError("Conflicting review receipt; preserve evidence")
-                    # Recovery may observe a replace whose directory fsync was
-                    # interrupted. Make the existing receipt durable before ACK.
-                    existing = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
-                    try:
-                        os.fchmod(existing, 0o600)
-                        os.fsync(existing)
-                    finally:
-                        os.close(existing)
-                    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-                    try:
-                        os.fsync(directory)
-                    finally:
-                        os.close(directory)
-                    return False
+                    if (matched or any(row.get(field) != payload.get(field) for field in fields)
+                            or ('receipt_id' in row and row['receipt_id'] != payload['receipt_id'])):
+                        raise ValueError("Conflicting or duplicate review receipt; preserve evidence")
+                    matched = True
+            if matched:
+                # Validate the ENTIRE log before acknowledging an existing
+                # receipt; a matching prefix must not hide a corrupt suffix.
+                # Recovery may observe a replace whose directory fsync was
+                # interrupted. Make the existing receipt durable before ACK.
+                existing = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+                try:
+                    os.fchmod(existing, 0o600)
+                    os.fsync(existing)
+                finally:
+                    os.close(existing)
+                directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+                return False
             temporary = path.with_suffix(path.suffix + "." + uuid.uuid4().hex + ".tmp")
             try:
                 descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
@@ -360,4 +366,5 @@ if __name__ == "__main__":
     if arguments.queue != QUEUE_PATH or arguments.review_log != REVIEW_LOG:
         parser.error("path overrides require --recover-reviews-only")
     raise SystemExit(main())
+
 
