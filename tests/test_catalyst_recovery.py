@@ -137,6 +137,42 @@ class Recovery(unittest.TestCase):
                 self.assertEqual(self.log_path.read_text(),contents)
                 self.assertEqual(len(self.queue.pending_reviews()),1)
 
+    def test_valid_first_receipt_cannot_hide_corrupt_or_conflicting_suffix(self):
+        row = self.done()
+        receipt = self.queue._review_receipt(row)
+        for suffix in ('{torn', json.dumps({**receipt, 'result': {'conflicting': True}}), json.dumps(receipt)):
+            with self.subTest(suffix=suffix):
+                contents = json.dumps(receipt) + '\n' + suffix + '\n'
+                self.log_path.write_text(contents)
+                with self.assertRaises(ValueError):
+                    flush_review_outbox(self.queue, self.log_path)
+                self.assertEqual(self.log_path.read_text(), contents)
+                self.assertEqual(len(self.queue.pending_reviews()), 1)
+
+    def test_wrong_explicit_receipt_identity_cannot_ack_by_matching_event(self):
+        row = self.done()
+        receipt = self.queue._review_receipt(row)
+        receipt['receipt_id'] = 'catalyst-review:wrong-event'
+        contents = json.dumps(receipt) + '\n'
+        self.log_path.write_text(contents)
+        with self.assertRaises(ValueError):
+            flush_review_outbox(self.queue, self.log_path)
+        self.assertEqual(self.log_path.read_text(), contents)
+        self.assertEqual(len(self.queue.pending_reviews()), 1)
+
+    def test_tampered_outbox_cannot_project_another_event_or_changed_result(self):
+        original = self.done()
+        for change in ({'event_id': 'another-event'}, {'result': {'forged': True}}, {'receipt_id': 'wrong-receipt'}):
+            with self.subTest(change=change):
+                row = json.loads(json.dumps(original))
+                row['review_outbox'].update(change)
+                contents = json.dumps(row) + '\n'
+                self.queue_path.write_text(contents)
+                with self.assertRaises(ValueError):
+                    flush_review_outbox(self.queue, self.log_path)
+                self.assertEqual(self.queue_path.read_text(), contents)
+                self.assertFalse(self.log_path.exists())
+
     def test_failed_replace_preserves_queue_and_recovery_intent(self):
         self.done()
         with patch.object(Path,'replace',side_effect=OSError('disk unavailable')):
@@ -211,3 +247,4 @@ class Recovery(unittest.TestCase):
         self.assertEqual(len(self.log_path.read_text().splitlines()),1)
 
 if __name__=='__main__':unittest.main()
+

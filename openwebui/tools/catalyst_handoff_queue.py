@@ -67,6 +67,10 @@ class CatalystHandoffQueue:
             attempts = row.get("attempts", 0)
             if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 0:
                 raise ValueError("Invalid queue attempt count; preserve file for recovery")
+            if "review_outbox" in row:
+                if (row.get("status") != "done" or "result" not in row
+                        or row["review_outbox"] != self._review_receipt(row)):
+                    raise ValueError("Review outbox does not match saved queue event; preserve evidence")
             if row["id"] in seen_ids:
                 raise ValueError("Duplicate queue event ID; preserve file for recovery")
             seen_ids.add(row["id"])
@@ -340,4 +344,5 @@ class CatalystHandoffQueue:
             "done": sum(row.get("status") == "done" for row in today_rows),
             "failed": sum(row.get("status") == "failed" for row in today_rows),
         }
+
 
