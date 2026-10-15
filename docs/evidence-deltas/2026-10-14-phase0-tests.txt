@@ -1,0 +1,32 @@
+test_account_identifiers_not_exported (test_helper_receipts.ReceiptsTests.test_account_identifiers_not_exported) ... ok
+test_completed_transport_with_error_not_pass (test_helper_receipts.ReceiptsTests.test_completed_transport_with_error_not_pass) ... ok
+test_empty_positions_is_valid_but_not_current (test_helper_receipts.ReceiptsTests.test_empty_positions_is_valid_but_not_current) ... ok
+test_history_pagination_disclosed (test_helper_receipts.ReceiptsTests.test_history_pagination_disclosed) ... ok
+test_malformed_json (test_helper_receipts.ReceiptsTests.test_malformed_json) ... ok
+test_missing_output_explicit (test_helper_receipts.ReceiptsTests.test_missing_output_explicit) ... ok
+test_orphan_and_duplicate_receipts_fail (test_helper_receipts.ReceiptsTests.test_orphan_and_duplicate_receipts_fail) ... ok
+test_reasoning_and_prose_never_evidence (test_helper_receipts.ReceiptsTests.test_reasoning_and_prose_never_evidence) ... ok
+test_wrong_payload_shape_is_invalid (test_helper_receipts.ReceiptsTests.test_wrong_payload_shape_is_invalid) ... ok
+test_current_message_not_arbitrary_last_insert (test_phase0_export.ExportTests.test_current_message_not_arbitrary_last_insert) ... ok
+test_duplicate_notes_rejected (test_phase0_export.ExportTests.test_duplicate_notes_rejected) ... ok
+test_existing_conflict_preserved (test_phase0_export.ExportTests.test_existing_conflict_preserved) ... ok
+test_existing_match_is_idempotent_without_importing_webui (test_phase0_export.ExportTests.test_existing_match_is_idempotent_without_importing_webui) ... ok
+test_mismatched_helper_owner_fails (test_phase0_export.ExportTests.test_mismatched_helper_owner_fails) ... ok
+test_readonly_export_and_preview_dont_write_note (test_phase0_export.ExportTests.test_readonly_export_and_preview_dont_write_note) ... ok
+test_yesterdays_chat_edited_today_not_a_new_occurrence (test_phase0_export.ExportTests.test_yesterdays_chat_edited_today_not_a_new_occurrence) ... ok
+test_bounded_excerpt_retains_hash_and_disclosure (test_phase0_handoff.HandoffTests.test_bounded_excerpt_retains_hash_and_disclosure) ... ok
+test_deterministic_order (test_phase0_handoff.HandoffTests.test_deterministic_order) ... ok
+test_duplicate_fails (test_phase0_handoff.HandoffTests.test_duplicate_fails) ... ok
+test_excess_runs_fail_instead_of_silent_loss (test_phase0_handoff.HandoffTests.test_excess_runs_fail_instead_of_silent_loss) ... ok
+test_london_day_not_utc_day (test_phase0_handoff.HandoffTests.test_london_day_not_utc_day) ... ok
+test_no_runs_is_incomplete (test_phase0_handoff.HandoffTests.test_no_runs_is_incomplete) ... ok
+test_preserves_conflicting_sessions_without_claiming_execution (test_phase0_handoff.HandoffTests.test_preserves_conflicting_sessions_without_claiming_execution) ... ok
+test_prior_day_fails (test_phase0_handoff.HandoffTests.test_prior_day_fails) ... ok
+test_scheduler_success_not_completed_response (test_phase0_handoff.HandoffTests.test_scheduler_success_not_completed_response) ... ok
+test_smoke_rejects_trade_or_live_escalation (test_phase0_handoff.HandoffTests.test_smoke_rejects_trade_or_live_escalation) ... ok
+test_wrong_owner_and_model_fail (test_phase0_handoff.HandoffTests.test_wrong_owner_and_model_fail) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 0.016s
+
+OK
