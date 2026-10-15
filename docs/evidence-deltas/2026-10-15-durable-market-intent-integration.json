@@ -1,0 +1,12 @@
+{
+  "version": "0.2.3-durable-market-intents-candidate",
+  "candidate_sha256": "a50687a53cc60187c07e159ba6e231662f6a06292fd0fc9dbf4252f0425e87a6",
+  "parent_branch": "feature/legacy-t212-advanced-orders-20261015",
+  "methods": [
+    "place_market_order_with_intent",
+    "close_position_with_intent"
+  ],
+  "tests_passed": 6,
+  "broker_calls": 0,
+  "production_deployed": false
+}
