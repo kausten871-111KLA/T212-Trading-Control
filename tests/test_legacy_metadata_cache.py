@@ -243,7 +243,8 @@ class LegacyCache(unittest.IsolatedAsyncioTestCase):
               "recent_transactions","operations_dashboard","list_positions","list_orders",
               "size_quantity","place_market_order","close_position"])
         self.assertEqual(methods[10:],["place_stop_order","place_limit_order",
-              "place_stop_limit_order","cancel_order","reconcile_order_intent"])
+              "place_stop_limit_order","cancel_order","reconcile_order_intent",
+              "place_market_order_with_intent","close_position_with_intent"])
 
 if __name__=="__main__":
     unittest.main()

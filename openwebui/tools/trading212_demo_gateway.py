@@ -2,7 +2,7 @@
 title: Trading 212 DEMO Gateway
 author: Katie / OpenAI
 description: Single server-side Trading 212 DEMO broker toolkit for DeepSeek/Open WebUI agents.
-version: 0.2.2-advanced-orders-candidate
+version: 0.2.3-durable-market-intents-candidate
 """
 
 import os
@@ -821,3 +821,61 @@ class Tools:
                 return self._show(dict(json.loads(row[1]), readbackError=error, retryAllowed=False))
             state = str(data.get("status", "UNKNOWN")).upper()
             return self._show(journal.save(db, intent_id, state, {"brokerOrderId": row[0], "brokerResponse": data, "verificationRequired": state not in OrderIntentJournal.TERMINAL, "retryAllowed": False}, row[0]))
+
+    async def place_market_order_with_intent(
+        self, side: str, ticker: str, quantity: float, intent_id: str, extended_hours: bool = False
+    ) -> str:
+        """Submit a DEMO MARKET order using a caller-created stable intent ID.
+
+        Different legitimate trading decisions must use distinct IDs. If submission
+        returns UNKNOWN, query reconcile_order_intent; do not create another ID to
+        replay the same decision. Existing place_market_order remains available.
+        :param side: BUY or SELL.
+        :param ticker: Exact T212 instrument identifier.
+        :param quantity: Positive fractional/whole share quantity.
+        :param intent_id: Unique immutable decision identifier, not a broker order ID.
+        :param extended_hours: True if chosen and instrument eligible.
+        :return: Recorded result and broker readback, when available.
+        """
+        try:
+            if not isinstance(side, str) or not isinstance(ticker, str):
+                raise ValueError("Valid BUY/SELL and exact T212 ticker required")
+            direction=side.strip().upper()
+            symbol=ticker.strip().upper()
+            if direction not in ("BUY","SELL") or not re.fullmatch(r"[A-Z0-9][A-Z0-9_.-]{0,63}",symbol):
+                raise ValueError("Valid BUY/SELL and exact T212 ticker required")
+            qty=self._positive(quantity,"quantity")
+            if not isinstance(extended_hours,bool):
+                raise ValueError("extended_hours must be boolean")
+            body={"ticker":symbol,"quantity":qty if direction=="BUY" else -qty,
+                  "extendedHours":extended_hours}
+            res=json.loads(await self._durable_mutation(
+                intent_id,"POST","/equity/orders/market",body))
+            res.update(action=direction,ticker=symbol,quantity=qty,
+                       extendedHours=extended_hours)
+            return self._show(res)
+        except (ValueError,TypeError,AttributeError,OverflowError) as exc:
+            return self._show({"state":"VALIDATION_FAILED","error":str(exc),
+                               "mutationAttempted":False,"environment":"DEMO",
+                               "liveTradingEnabled":False})
+
+    async def close_position_with_intent(self,ticker: str,intent_id: str) -> str:
+        """Close a verified DEMO position using a durable SELL intent.
+
+        :param ticker: Exact T212 instrument identifier.
+        :param intent_id: Stable unique close-decision identifier.
+        :return: Submission and broker verification status.
+        """
+        if not isinstance(ticker,str) or not re.fullmatch(r"[A-Z0-9][A-Z0-9_.-]{0,63}",ticker.strip().upper()):
+            return self._show({"state":"VALIDATION_FAILED","mutationAttempted":False,
+                               "error":"Exact T212 ticker required"})
+        symbol=ticker.strip().upper()
+        positions,error=await self._request("GET","/equity/positions")
+        if error:return error
+        matches=[p for p in (positions if isinstance(positions,list) else [])
+                 if (p.get("ticker") or (p.get("instrument") or {}).get("ticker","")).upper()==symbol]
+        available=sum(float(p.get("quantityAvailableForTrading") or 0) for p in matches)
+        if available<=0:return self._show({"state":"NO_POSITION","ticker":symbol,
+                                           "mutationAttempted":False})
+        return await self.place_market_order_with_intent(
+            "SELL",symbol,available,intent_id,False)
