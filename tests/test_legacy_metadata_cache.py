@@ -233,15 +233,17 @@ class LegacyCache(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result2["action"],"SELL")
         self.assertTrue(result["verificationRequired"])
 
-    async def test_old_method_surface_stays_ten(self):
+    async def test_original_method_surface_preserved_with_additions(self):
         import ast
         tree=ast.parse(SOURCE.read_text())
         cls=[x for x in tree.body if isinstance(x,ast.ClassDef) and x.name=="Tools"][0]
         methods=[x.name for x in cls.body if isinstance(x,(ast.FunctionDef,ast.AsyncFunctionDef))
                  and not x.name.startswith("_")]
-        self.assertEqual(methods,["trading_dashboard","find_instrument","recent_order_history",
+        self.assertEqual(methods[:10],["trading_dashboard","find_instrument","recent_order_history",
               "recent_transactions","operations_dashboard","list_positions","list_orders",
               "size_quantity","place_market_order","close_position"])
+        self.assertEqual(methods[10:],["place_stop_order","place_limit_order",
+              "place_stop_limit_order","cancel_order","reconcile_order_intent"])
 
 if __name__=="__main__":
     unittest.main()

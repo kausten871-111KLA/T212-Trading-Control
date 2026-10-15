@@ -2,7 +2,7 @@
 title: Trading 212 DEMO Gateway
 author: Katie / OpenAI
 description: Single server-side Trading 212 DEMO broker toolkit for DeepSeek/Open WebUI agents.
-version: 0.2.1-cache-candidate
+version: 0.2.2-advanced-orders-candidate
 """
 
 import os
@@ -14,6 +14,8 @@ import hashlib
 import uuid
 import asyncio
 import re
+import math
+from email.utils import parsedate_to_datetime
 from contextlib import closing
 
 
@@ -51,12 +53,24 @@ class _MetadataCache:
             raw, fetched, earliest, owner, lease_until = db.execute(
                 "SELECT payload,fetched,earliest,owner,lease_until FROM metadata WHERE scope=?",
                 (scope,)).fetchone()
+            for value in (fetched,earliest,lease_until):
+                if not isinstance(value,(int,float)) or not math.isfinite(value) or value < 0:
+                    raise ValueError("Invalid metadata timestamps")
+            if fetched > now + 5:
+                raise ValueError("Future metadata timestamp is unverified")
             data = json.loads(raw) if raw is not None else None
-            if data is not None and (not isinstance(data,list) or not all(isinstance(x,dict) for x in data)):
+            if data is not None and (not isinstance(data,list) or not data or not all(
+                isinstance(x,dict) and isinstance(x.get("ticker"),str) and x["ticker"] for x in data)):
                 raise ValueError("Damaged metadata cache must be preserved")
             age = max(0,now-fetched) if fetched else None
             if age is not None and age <= self.TTL:
                 return "fresh",data,age,None,0
+            # Global 429 cooldown bridges metadata and fresh broker reads.
+            global_row = db.execute("SELECT earliest FROM read_budget WHERE scope=? AND route=?", (scope,"*")).fetchone()
+            global_deadline=global_row[0] if global_row else 0
+            if not isinstance(global_deadline,(int,float)) or not math.isfinite(global_deadline) or global_deadline < 0:
+                raise ValueError("Invalid durable account cooldown")
+            earliest = max(earliest, global_deadline)
             if now < earliest or (owner and now < lease_until):
                 wait=max(0,earliest-now,lease_until-now if owner else 0)
                 return "waiting",data,age,None,wait
@@ -94,6 +108,15 @@ class _MetadataCache:
             db.execute("INSERT OR IGNORE INTO read_budget(scope,route) VALUES (?,?)",(scope,route))
             earliest=db.execute("SELECT earliest FROM read_budget WHERE scope=? AND route=?",
                                 (scope,route)).fetchone()[0]
+            global_row=db.execute("SELECT earliest FROM read_budget WHERE scope=? AND route=?",(scope,"*")).fetchone()
+            global_deadline=global_row[0] if global_row else 0
+            if not isinstance(global_deadline,(int,float)) or not math.isfinite(global_deadline) or global_deadline < 0:
+                raise ValueError("Invalid durable account cooldown")
+            if not isinstance(earliest,(int,float)) or not math.isfinite(earliest) or earliest < 0:
+                raise ValueError("Invalid durable read budget")
+            earliest=max(earliest,global_deadline)
+            if not math.isfinite(earliest) or earliest < 0:
+                raise ValueError("Invalid durable read budget")
             wait=max(0,earliest-now)
             if wait>5:
                 return wait,False
@@ -101,17 +124,95 @@ class _MetadataCache:
                        (max(now,earliest)+gap,scope,route))
             return wait,True
 
+    def cooldown_remaining(self,scope,now):
+        with closing(self._connect()) as db:
+            row=db.execute("SELECT earliest FROM read_budget WHERE scope=? AND route=?",(scope,"*")).fetchone()
+            if row and (not isinstance(row[0],(int,float)) or not math.isfinite(row[0]) or row[0] < 0):
+                raise ValueError("Invalid durable account cooldown")
+            return max(0,row[0]-now) if row else 0
+
     def defer_read(self,scope,route,seconds):
         with closing(self._connect()) as db,db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute("INSERT OR IGNORE INTO read_budget(scope,route) VALUES (?,?)",(scope,route))
-            db.execute("UPDATE read_budget SET earliest=MAX(earliest,?) WHERE scope=? AND route=?",
-                       (time.time()+max(0,seconds),scope,route))
+            deadline=time.time()+max(0,seconds)
+            for target in (route,"*"):
+                db.execute("INSERT OR IGNORE INTO read_budget(scope,route) VALUES (?,?)",(scope,target))
+                db.execute("UPDATE read_budget SET earliest=MAX(earliest,?) WHERE scope=? AND route=?",
+                           (deadline,scope,target))
+            db.execute("UPDATE metadata SET earliest=MAX(earliest,?) WHERE scope=?",(deadline,scope))
 
     @staticmethod
     def retry_delay(error):
         match=re.search(r"Retry-After:\s*(\d+(?:\.\d+)?)",error or "",re.I)
-        return max(55,min(3600,float(match.group(1)))) if match else 55
+        return max(55,float(match.group(1))) if match else 55
+
+
+from pathlib import Path
+from contextlib import asynccontextmanager
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
+
+class OrderIntentJournal:
+    """Durable at-most-one mutation attempt per explicit intent on shared local disk."""
+    TERMINAL = {"FILLED", "CANCELLED", "CANCELED", "REJECTED", "EXPIRED"}
+
+    def __init__(self, path):
+        self.path = Path(path)
+
+    @asynccontextmanager
+    async def locked(self):
+        if fcntl is None:
+            raise RuntimeError("Order-intent locking requires Linux fcntl")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.path.with_suffix(".lock")
+        handle = lock_path.open("a+")
+        os.chmod(lock_path, 0o600)
+        deadline = time.monotonic() + 180
+        try:
+            while True:
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("Order-intent lock timed out")
+                    await asyncio.sleep(0.05)
+            db = sqlite3.connect(str(self.path))
+            os.chmod(self.path, 0o600)
+            try:
+                db.execute("PRAGMA synchronous=FULL")
+                db.execute("CREATE TABLE IF NOT EXISTS intents (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, payload TEXT NOT NULL, state TEXT NOT NULL, broker_id TEXT, result TEXT NOT NULL)")
+                db.execute("CREATE TABLE IF NOT EXISTS budget (id INTEGER PRIMARY KEY, last_attempt REAL NOT NULL)")
+                db.commit()
+                yield db
+            finally:
+                db.close()
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
+
+    @staticmethod
+    def save(db, intent_id, state, result, broker_id=None):
+        result = dict(result, intentId=intent_id, state=state, environment="DEMO", liveTradingEnabled=False)
+        db.execute("UPDATE intents SET state=?,broker_id=COALESCE(?,broker_id),result=? WHERE id=?", (state, broker_id, json.dumps(result, default=str), intent_id))
+        if state in OrderIntentJournal.TERMINAL and broker_id is not None:
+            for other_id, encoded in db.execute("SELECT id,result FROM intents WHERE broker_id=? AND id!=?", (broker_id, intent_id)).fetchall():
+                other = dict(json.loads(encoded), state=state, brokerResponse=result.get("brokerResponse"), verificationRequired=False, retryAllowed=False)
+                db.execute("UPDATE intents SET state=?,result=? WHERE id=?", (state, json.dumps(other, default=str), other_id))
+        db.commit()
+        return result
+
+    @staticmethod
+    async def pace(db):
+        row = db.execute("SELECT last_attempt FROM budget WHERE id=1").fetchone()
+        wait = max(0, 2 - (time.time() - row[0])) if row else 0
+        if wait:
+            await asyncio.sleep(wait)
+        db.execute("INSERT OR REPLACE INTO budget VALUES (1,?)", (time.time(),))
+        db.commit()
 
 class Tools:
     def __init__(self):
@@ -143,20 +244,27 @@ class Tools:
         if not key or not secret:
             return None, "T212 DEMO credentials are not available to Open WebUI."
 
-        # Fresh broker truth: account reads are paced, never cached.
+        # Query/cursor changes never create another endpoint budget.
+        route=path.split("?",1)[0]
         read_gaps={"/equity/account/summary":5.5,
                    "/equity/positions":1.25,
-                   "/equity/orders":5.5}
-        budget_scope=None
-        if method == "GET" and path in read_gaps:
-            budget_scope=self._broker_scope(key)
+                   "/equity/orders":5.5,
+                   "/equity/history/orders":10.5,
+                   "/equity/history/transactions":10.5}
+        budget_scope=self._broker_scope(key) if method == "GET" else None
+        if budget_scope:
             try:
-                wait,reserved=await asyncio.to_thread(
-                    self._metadata_cache.reserve_read,budget_scope,path,read_gaps[path],time.time())
-                if not reserved:
-                    return None, f"T212 DEMO GET paced; retry after {wait:.1f}s. No stale broker state returned."
-                if wait:
-                    await asyncio.sleep(wait)
+                if route in read_gaps:
+                    wait,reserved=await asyncio.to_thread(
+                        self._metadata_cache.reserve_read,budget_scope,route,read_gaps[route],time.time())
+                    if not reserved:
+                        return None, f"T212 DEMO GET paced; retry after {wait:.1f}s. No stale broker state returned."
+                    if wait:
+                        await asyncio.sleep(wait)
+                # Recheck after waiting: another worker may have received 429.
+                remaining=await asyncio.to_thread(self._metadata_cache.cooldown_remaining,budget_scope,time.time())
+                if remaining:
+                    return None, f"T212 DEMO GET account cooldown; retry after {remaining:.1f}s. No stale broker state returned."
             except (OSError,sqlite3.Error,ValueError) as exc:
                 return None, f"T212 DEMO read budget unavailable ({type(exc).__name__}); no GET attempted."
 
@@ -181,16 +289,29 @@ class Tools:
                     data = response.text
 
                 if response.is_error:
-                    header=response.headers.get("Retry-After","").strip()
-                    delay=header if re.fullmatch(r"\d+(?:\.\d+)?",header) else ""
-                    reset=response.headers.get("x-ratelimit-reset","").strip()
-                    if not delay and re.fullmatch(r"\d+(?:\.\d+)?",reset):
-                        delay=str(max(0,float(reset)-time.time()))
+                    delays=[]
+                    header=response.headers.get("Retry-After", "").strip()
+                    try:
+                        seconds=float(header)
+                    except ValueError:
+                        try:
+                            seconds=parsedate_to_datetime(header).timestamp()-time.time()
+                        except (ValueError,TypeError,OverflowError):
+                            seconds=0
+                    if math.isfinite(seconds) and seconds>=0:
+                        delays.append(seconds)
+                    try:
+                        reset=float(response.headers.get("x-ratelimit-reset", ""))-time.time()
+                        if math.isfinite(reset) and reset>=0:
+                            delays.append(reset)
+                    except (ValueError,TypeError,OverflowError):
+                        pass
+                    delay=max(delays,default=0)
                     suffix=f" (Retry-After: {delay})" if delay else ""
                     if response.status_code == 429 and budget_scope:
                         try:
                             await asyncio.to_thread(self._metadata_cache.defer_read,
-                                budget_scope,path,_MetadataCache.retry_delay(suffix))
+                                budget_scope,route,max(55,delay))
                         except (OSError,sqlite3.Error,ValueError):
                             return None,"Broker GET throttled and cooldown persistence failed; stop repeated reads."
                     return None, f"T212 DEMO API error {response.status_code}{suffix}: {data}"
@@ -562,3 +683,141 @@ class Tools:
             quantity=available,
             extended_hours=False,
         )
+
+    def _order_journal(self):
+        if self.base_url != "https://demo.trading212.com/api/v0":
+            raise ValueError("DEMO endpoint required")
+        key, secret = self._credentials()
+        if not key or not secret:
+            raise ValueError("DEMO credentials unavailable")
+        namespace = hashlib.sha256(key.encode()).hexdigest()[:24]
+        return OrderIntentJournal(Path(self._metadata_cache.path).parent / ("t212_order_intents_" + namespace + ".sqlite3"))
+
+    @staticmethod
+    def _positive(value, name):
+        if isinstance(value, bool):
+            raise ValueError(name + " must be a positive finite number")
+        number = float(value)
+        if not math.isfinite(number) or number <= 0:
+            raise ValueError(name + " must be a positive finite number")
+        return number
+
+    async def _sell_capacity(self, db, ticker, quantity):
+        positions, error = await self._request("GET", "/equity/positions")
+        if error or not isinstance(positions, list):
+            raise ValueError("Cannot verify broker holdings")
+        orders, error = await self._request("GET", "/equity/orders")
+        if error or not isinstance(orders, list):
+            raise ValueError("Cannot verify existing sell reservations")
+        def symbol(row):
+            return row.get("ticker") or (row.get("instrument") or {}).get("ticker")
+        matching = [p for p in positions if symbol(p) == ticker]
+        available = sum(float(p.get("quantityAvailableForTrading", p.get("quantity", 0))) for p in matching)
+        if any("quantityAvailableForTrading" not in p for p in matching):
+            available -= sum(max(0, abs(float(o.get("quantity", 0))) - abs(float(o.get("filledQuantity", 0)))) for o in orders if symbol(o) == ticker and (str(o.get("side", "")).upper() == "SELL" or float(o.get("quantity", 0)) < 0))
+        pending_ids = {str(o.get("id")) for o in orders}
+        for encoded, state, broker_id in db.execute("SELECT payload,state,broker_id FROM intents"):
+            local = json.loads(encoded)
+            if state in OrderIntentJournal.TERMINAL or local.get("method") != "POST":
+                continue
+            body = local.get("body", {})
+            if body.get("ticker") == ticker and body.get("quantity", 0) < 0 and (not broker_id or str(broker_id) not in pending_ids):
+                available -= abs(body["quantity"])
+        if not math.isfinite(available) or quantity > max(0, available) + 1e-9:
+            raise ValueError("SELL exceeds verified unreserved holdings")
+
+    async def _durable_mutation(self, intent_id, method, path, body):
+        try:
+            if not isinstance(intent_id, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", intent_id):
+                raise ValueError("A stable explicit intent_id is required")
+            journal = self._order_journal()
+            payload = {"method": method, "path": path, "body": body}
+            encoded = json.dumps(payload, sort_keys=True, allow_nan=False)
+            fingerprint = hashlib.sha256(encoded.encode()).hexdigest()
+            async with journal.locked() as db:
+                previous = db.execute("SELECT fingerprint,result FROM intents WHERE id=?", (intent_id,)).fetchone()
+                if previous:
+                    if previous[0] != fingerprint:
+                        raise ValueError("intent_id already identifies a different request")
+                    return self._show(dict(json.loads(previous[1]), replayBlocked=True))
+                if method == "POST" and body["quantity"] < 0:
+                    await self._sell_capacity(db, body["ticker"], abs(body["quantity"]))
+                if method == "DELETE":
+                    existing, error = await self._request("GET", path)
+                    if error or not isinstance(existing, dict):
+                        raise ValueError("Cannot verify order before cancellation")
+                    if str(existing.get("status", "")).upper() in OrderIntentJournal.TERMINAL:
+                        state = str(existing["status"]).upper()
+                        result = journal.save(db, intent_id, state, {"mutationAttempted": False, "brokerResponse": existing, "verificationRequired": False, "retryAllowed": False}, path.rsplit("/", 1)[-1])
+                        return self._show(result)
+                # Commit the unresolved intent BEFORE transmission. A crash cannot authorize a replay.
+                unresolved = {"state": "UNKNOWN", "intentId": intent_id, "verificationRequired": True, "environment": "DEMO", "liveTradingEnabled": False}
+                db.execute("INSERT INTO intents VALUES (?,?,?,?,?,?)", (intent_id, fingerprint, encoded, "UNKNOWN", None, json.dumps(unresolved)))
+                db.commit()
+                await journal.pace(db)
+                data, error = await self._request(method, path, json_body=body if method == "POST" else None)
+                if error:
+                    return self._show(journal.save(db, intent_id, "UNKNOWN", {"error": error, "verificationRequired": True, "retryAllowed": False}))
+                broker_id = str(data.get("id")) if isinstance(data, dict) and data.get("id") is not None else None
+                if method == "DELETE":
+                    broker_id = path.rsplit("/", 1)[-1]
+                if not broker_id:
+                    return self._show(journal.save(db, intent_id, "UNKNOWN", {"brokerResponse": data, "verificationRequired": True, "retryAllowed": False}))
+                journal.save(db, intent_id, "SUBMITTED", {"brokerResponse": data, "verificationRequired": True}, broker_id)
+                verified, read_error = await self._request("GET", "/equity/orders/" + broker_id)
+                state = str(verified.get("status", "UNKNOWN")).upper() if isinstance(verified, dict) else "UNKNOWN"
+                # DELETE acceptance alone never means the order was cancelled or unfilled.
+                return self._show(journal.save(db, intent_id, state, {"brokerOrderId": broker_id, "brokerResponse": verified, "readbackError": read_error, "verificationRequired": state not in OrderIntentJournal.TERMINAL, "retryAllowed": False}, broker_id))
+        except (ValueError, TypeError, OverflowError) as exc:
+            return self._show({"state": "VALIDATION_FAILED", "error": str(exc), "mutationAttempted": False, "environment": "DEMO", "liveTradingEnabled": False})
+
+    async def _pending_order(self, kind, side, ticker, quantity, intent_id, time_validity, stop_price=None, limit_price=None):
+        try:
+            side = side.strip().upper()
+            ticker = ticker.strip().upper()
+            if side not in ("BUY", "SELL") or not re.fullmatch(r"[A-Z0-9][A-Z0-9_.-]{0,63}", ticker):
+                raise ValueError("Valid BUY/SELL and exact broker ticker required")
+            quantity = self._positive(quantity, "quantity")
+            if time_validity not in ("DAY", "GOOD_TILL_CANCEL"):
+                raise ValueError("time_validity must be DAY or GOOD_TILL_CANCEL")
+            body = {"ticker": ticker, "quantity": quantity if side == "BUY" else -quantity, "timeValidity": time_validity}
+            if kind in ("stop", "stop_limit"):
+                body["stopPrice"] = self._positive(stop_price, "stop_price")
+            if kind in ("limit", "stop_limit"):
+                body["limitPrice"] = self._positive(limit_price, "limit_price")
+            return await self._durable_mutation(intent_id, "POST", "/equity/orders/" + kind, body)
+        except (ValueError, TypeError, AttributeError, OverflowError) as exc:
+            return self._show({"state": "VALIDATION_FAILED", "error": str(exc), "mutationAttempted": False})
+
+    async def place_stop_order(self, side: str, ticker: str, quantity: float, stop_price: float, intent_id: str, time_validity: str = "DAY") -> str:
+        """Submit a DEMO STOP once per durable intent_id; read back broker status. Stops may slip."""
+        return await self._pending_order("stop", side, ticker, quantity, intent_id, time_validity, stop_price=stop_price)
+
+    async def place_limit_order(self, side: str, ticker: str, quantity: float, limit_price: float, intent_id: str, time_validity: str = "DAY") -> str:
+        """Submit a DEMO LIMIT once per durable intent_id; acceptance is not a fill."""
+        return await self._pending_order("limit", side, ticker, quantity, intent_id, time_validity, limit_price=limit_price)
+
+    async def place_stop_limit_order(self, side: str, ticker: str, quantity: float, stop_price: float, limit_price: float, intent_id: str, time_validity: str = "DAY") -> str:
+        """Submit a DEMO STOP_LIMIT once per durable intent_id; it can trigger without filling."""
+        return await self._pending_order("stop_limit", side, ticker, quantity, intent_id, time_validity, stop_price=stop_price, limit_price=limit_price)
+
+    async def cancel_order(self, order_id: int, intent_id: str) -> str:
+        """Attempt DEMO cancellation once, then read status. A racing fill remains FILLED."""
+        if isinstance(order_id, bool) or not isinstance(order_id, int) or order_id <= 0:
+            return self._show({"state": "VALIDATION_FAILED", "mutationAttempted": False, "error": "Positive integer order_id required"})
+        return await self._durable_mutation(intent_id, "DELETE", "/equity/orders/" + str(order_id), {})
+
+    async def reconcile_order_intent(self, intent_id: str) -> str:
+        """Read-only broker reconciliation for an existing intent; never resubmit an UNKNOWN mutation."""
+        journal = self._order_journal()
+        async with journal.locked() as db:
+            row = db.execute("SELECT broker_id,result FROM intents WHERE id=?", (intent_id,)).fetchone()
+            if not row:
+                return self._show({"state": "NOT_FOUND", "retryAllowed": False})
+            if not row[0]:
+                return self._show(dict(json.loads(row[1]), reconciliation="Manual broker history/positions reconciliation required; no known broker ID", retryAllowed=False))
+            data, error = await self._request("GET", "/equity/orders/" + row[0])
+            if error or not isinstance(data, dict):
+                return self._show(dict(json.loads(row[1]), readbackError=error, retryAllowed=False))
+            state = str(data.get("status", "UNKNOWN")).upper()
+            return self._show(journal.save(db, intent_id, state, {"brokerOrderId": row[0], "brokerResponse": data, "verificationRequired": state not in OrderIntentJournal.TERMINAL, "retryAllowed": False}, row[0]))

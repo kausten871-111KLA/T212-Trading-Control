@@ -1,0 +1,45 @@
+{
+  "source_sha256": "87e94593bca55f542be34cd8e7b68bb451cda75eed6ae789805dd73ff65bf05b",
+  "candidate_sha256": "0d3ed302355df1489a0d3e90fdcc0dbc9c9f32af288ad91c8e25694811a650f5",
+  "legacy_methods_preserved": [
+    "__init__",
+    "_broker_scope",
+    "_credentials",
+    "_show",
+    "_request",
+    "trading_dashboard",
+    "find_instrument",
+    "recent_order_history",
+    "recent_transactions",
+    "operations_dashboard",
+    "list_positions",
+    "list_orders",
+    "size_quantity",
+    "place_market_order",
+    "close_position"
+  ],
+  "added_methods": [
+    "_order_journal",
+    "_positive",
+    "_sell_capacity",
+    "_durable_mutation",
+    "_pending_order",
+    "place_stop_order",
+    "place_limit_order",
+    "place_stop_limit_order",
+    "cancel_order",
+    "reconcile_order_intent"
+  ],
+  "production_deployed": false,
+  "git_branch": "feature/legacy-t212-advanced-orders-20261015",
+  "deployment": "NOT DEPLOYED. Requires guarded WebUI API rollout and actual DEMO broker acceptance.",
+  "gateway_candidate_version": "0.2.2-advanced-orders-candidate",
+  "order_management_methods": [
+    "place_stop_order",
+    "place_limit_order",
+    "place_stop_limit_order",
+    "cancel_order",
+    "reconcile_order_intent"
+  ],
+  "provider_calls_from_tests": 0
+}
