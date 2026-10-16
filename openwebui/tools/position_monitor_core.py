@@ -187,6 +187,42 @@ def normalized_receipt(payload):
         return ("ACKNOWLEDGED",data)
     return ("UNKNOWN",data)
 
+def index_positions(positions):
+    """Index exact broker identities; never choose between competing rows.
+
+    A malformed unrelated row must not crash every controller watch. If a row
+    names a valid ticker but also supplies malformed/conflicting identity data,
+    keep that ticker ambiguous for the entire snapshot, regardless of row order.
+    """
+    indexed = {}
+    ambiguous = set()
+    for position in positions:
+        if not isinstance(position, dict):
+            continue
+        top = position.get("ticker")
+        instrument = position.get("instrument")
+        malformed = instrument is not None and not isinstance(instrument, dict)
+        nested = instrument.get("ticker") if isinstance(instrument, dict) else None
+        identities = set()
+        for value in (top, nested):
+            if value is None:
+                continue
+            if not isinstance(value, str) or not TICKER.fullmatch(value):
+                malformed = True
+            else:
+                identities.add(value)
+        if malformed or len(identities) != 1:
+            ambiguous.update(identities)
+            continue
+        ticker = next(iter(identities))
+        if ticker in indexed:
+            ambiguous.add(ticker)
+        else:
+            indexed[ticker] = position
+    for ticker in ambiguous:
+        indexed.pop(ticker, None)
+    return indexed, ambiguous
+
 async def monitor_once(ledger, position_provider, submit_exit, reconcile_intent):
     """Evaluate only controller-registered exit conditions against broker position prices.
 
@@ -215,14 +251,13 @@ async def monitor_once(ledger, position_provider, submit_exit, reconcile_intent)
     if not isinstance(positions,list):
         outcome["unavailable"].append({"source":"broker_positions","reason":"invalid_payload"})
         return outcome
-    byticker={}
-    for row in positions:
-        if isinstance(row,dict):
-            ticker=row.get("ticker") or (row.get("instrument") or {}).get("ticker")
-            if ticker and ticker not in byticker:byticker[ticker]=row
+    byticker,ambiguous=index_positions(positions)
     for row in active:
         outcome["checked"]+=1
         symbol=row["ticker"]
+        if symbol in ambiguous:
+            outcome["unavailable"].append({"watch_id":row["watch_id"],"reason":"ambiguous_position_ticker"})
+            continue
         position=byticker.get(symbol)
         if not position:
             outcome["unavailable"].append({"watch_id":row["watch_id"],"reason":"position_not_confirmed"})
@@ -249,3 +284,4 @@ async def monitor_once(ledger, position_provider, submit_exit, reconcile_intent)
             ledger.record(row["watch_id"],"UNKNOWN",{"error":type(exc).__name__})
             outcome["unavailable"].append({"watch_id":row["watch_id"],"reason":type(exc).__name__})
     return outcome
+
