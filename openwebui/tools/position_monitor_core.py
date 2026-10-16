@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 VALID_OPERATORS = {"AT_OR_ABOVE", "AT_OR_BELOW"}
-VALID_STATUSES = {"ACTIVE", "CLAIMED", "UNKNOWN", "ACKNOWLEDGED", "FILLED", "CANCELLED", "REJECTED"}
+VALID_STATUSES = {"ACTIVE", "CLAIMED", "UNKNOWN", "ACKNOWLEDGED", "FILLED", "CANCELLED", "REJECTED", "EXPIRED"}
 TICKER = re.compile(r"[A-Z0-9][A-Z0-9_.-]{0,63}\Z")
 ID = re.compile(r"[A-Za-z0-9_.:-]{1,128}\Z")
 
@@ -158,7 +158,7 @@ class MonitorLedger:
             row=db.execute("SELECT state FROM watches WHERE watch_id=?",(watch_id,)).fetchone()
             if row is None or row["state"] not in ("CLAIMED","UNKNOWN","ACKNOWLEDGED"):
                 raise MonitorError("Only outstanding watch can receive a broker receipt")
-            if state not in ("UNKNOWN","ACKNOWLEDGED","FILLED","REJECTED","CANCELLED"):
+            if state not in ("UNKNOWN","ACKNOWLEDGED","FILLED","REJECTED","CANCELLED","EXPIRED"):
                 raise MonitorError("Unconfirmed state not accepted")
             now=time.time()
             db.execute("UPDATE watches SET state=?,broker_receipt=?,updated_at=? WHERE watch_id=?",
@@ -181,9 +181,9 @@ def normalized_receipt(payload):
     if not isinstance(data,dict):
         return ("UNKNOWN",{"error":"Broker result is not an object"})
     status=str(data.get("state",data.get("status","UNKNOWN"))).upper()
-    if status in ("FILLED","CANCELLED","CANCELED","REJECTED"):
+    if status in ("FILLED","CANCELLED","CANCELED","REJECTED","EXPIRED"):
         return ("CANCELLED" if status=="CANCELED" else status,data)
-    if status in ("PENDING","PARTIAL","SUBMITTED","NEW"):
+    if status in ("PENDING","PARTIAL","PARTIALLY_FILLED","SUBMITTED","NEW","ACKNOWLEDGED"):
         return ("ACKNOWLEDGED",data)
     return ("UNKNOWN",data)
 

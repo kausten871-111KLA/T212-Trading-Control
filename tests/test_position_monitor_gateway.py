@@ -63,6 +63,78 @@ class MonitorGatewayTests(unittest.IsolatedAsyncioTestCase):
     def posts(self):
         return [row for row in self.calls if row[0] == 'POST']
 
+    def gateway_with_http_fixture(self, rate_limited=False):
+        """Keep _request and its persisted budgets; replace only HTTP I/O."""
+        tool = Tools()
+        tool._metadata_cache.path = str(self.root / 'metadata.sqlite')
+        tool._credentials = lambda: ('synthetic-test-key', 'synthetic-test-secret')
+        outer = self
+
+        class Response:
+            def __init__(self, data, status=200):
+                self.data = data
+                self.status_code = status
+                self.is_error = status >= 400
+                self.headers = {'Retry-After': '60'} if status == 429 else {}
+                self.text = json.dumps(data)
+
+            def json(self):
+                return self.data
+
+        class Client:
+            def __init__(self, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def request(self, method, url, json=None, headers=None):
+                prefix = 'https://demo.trading212.com/api/v0'
+                if not url.startswith(prefix + '/'):
+                    raise AssertionError('Non-DEMO URL')
+                path = url[len(prefix):]
+                outer.calls.append((method, path, json))
+                if rate_limited:
+                    return Response({'error': 'synthetic throttle'}, 429)
+                if method == 'GET' and path == '/equity/positions':
+                    return Response(outer.positions_payload)
+                if method == 'GET' and path == '/equity/orders':
+                    return Response([])
+                if method == 'POST' and path == '/equity/orders/market':
+                    return Response({'id': 123})
+                if method == 'GET' and path == '/equity/orders/123':
+                    return Response({'id': 123, 'status': outer.order_state})
+                raise AssertionError('Unexpected gateway route')
+
+        http = types.SimpleNamespace(AsyncClient=Client, BasicAuth=lambda *args: object())
+        replacement = patch.object(gateway_module, 'httpx', http)
+        replacement.start()
+        self.addCleanup(replacement.stop)
+        return tool
+
+    async def test_full_request_path_preserves_read_pacing_and_durable_submission(self):
+        tool = self.gateway_with_http_fixture()
+        outcome = await DemoMonitorGateway(tool).tick(self.ledger)
+        self.assertEqual(outcome['submitted'], 1)
+        self.assertEqual(len(self.posts()), 1)
+        self.assertEqual(len(self.ledger.rows(('FILLED',))), 1)
+        self.assertEqual([x[1] for x in self.calls], [
+            '/equity/positions', '/equity/positions', '/equity/orders',
+            '/equity/orders/market', '/equity/orders/123'])
+
+    async def test_full_request_429_persists_cooldown_without_burning_watch(self):
+        adapter = DemoMonitorGateway(self.gateway_with_http_fixture(rate_limited=True))
+        first = await adapter.tick(self.ledger)
+        second = await adapter.tick(MonitorLedger(self.root / 'watches.sqlite'))
+        self.assertEqual(first['submitted'], 0)
+        self.assertEqual(second['submitted'], 0)
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.posts(), [])
+        self.assertEqual(len(self.ledger.rows()), 1)
+
     async def test_json_positions_reach_existing_durable_sell_method(self):
         outcome = await DemoMonitorGateway(self.gateway()).tick(self.ledger)
         self.assertEqual(outcome['submitted'], 1)
@@ -81,6 +153,34 @@ class MonitorGatewayTests(unittest.IsolatedAsyncioTestCase):
         result = await DemoMonitorGateway(self.gateway()).tick(restarted)
         self.assertEqual(result['reconciled'], 1)
         self.assertEqual(len(restarted.rows(('FILLED',))), 1)
+        self.assertEqual(len(self.posts()), 1)
+
+    async def test_expired_order_is_terminal_and_not_polled_forever(self):
+        self.order_state = 'EXPIRED'
+        adapter = DemoMonitorGateway(self.gateway())
+        await adapter.tick(self.ledger)
+        self.assertEqual(len(self.ledger.rows(('EXPIRED',))), 1)
+        prior_calls = len(self.calls)
+        await DemoMonitorGateway(self.gateway()).tick(MonitorLedger(self.root / 'watches.sqlite'))
+        self.assertEqual(len(self.calls), prior_calls)
+        self.assertEqual(len(self.posts()), 1)
+
+    async def test_pending_order_can_reconcile_to_expired_after_restart(self):
+        self.order_state = 'NEW'
+        await DemoMonitorGateway(self.gateway()).tick(self.ledger)
+        self.order_state = 'EXPIRED'
+        restarted = MonitorLedger(self.root / 'watches.sqlite')
+        await DemoMonitorGateway(self.gateway()).tick(restarted)
+        self.assertEqual(len(restarted.rows(('EXPIRED',))), 1)
+        self.assertEqual(len(self.posts()), 1)
+
+    async def test_partial_fill_remains_acknowledged_until_reconciled(self):
+        self.order_state = 'PARTIALLY_FILLED'
+        await DemoMonitorGateway(self.gateway()).tick(self.ledger)
+        self.assertEqual(len(self.ledger.rows(('ACKNOWLEDGED',))), 1)
+        self.order_state = 'FILLED'
+        await DemoMonitorGateway(self.gateway()).tick(self.ledger)
+        self.assertEqual(len(self.ledger.rows(('FILLED',))), 1)
         self.assertEqual(len(self.posts()), 1)
 
     async def test_timeout_remains_unknown_across_restart_without_second_post(self):
