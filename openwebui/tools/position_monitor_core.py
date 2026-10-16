@@ -125,7 +125,8 @@ class MonitorLedger:
         try:
             mask=",".join("?" for _ in states)
             return [dict(r) for r in db.execute(
-                "SELECT * FROM watches WHERE state IN ("+mask+") ORDER BY created_at,watch_id",tuple(states))]
+                "SELECT watches.*, (SELECT MAX(id) FROM events WHERE events.watch_id=watches.watch_id) "
+                "AS revision FROM watches WHERE state IN ("+mask+") ORDER BY created_at,watch_id",tuple(states))]
         finally: db.close()
 
     def claim(self, watch_id, observed_price):
@@ -149,13 +150,24 @@ class MonitorLedger:
             db.rollback();raise
         finally: db.close()
 
-    def record(self, watch_id, state, receipt):
+    def record(self, watch_id, state, receipt, expected_revision=None):
+        """Apply a receipt only while its observed ledger revision is current.
+
+        Event IDs survive restarts and do not rely on wall-clock ordering.
+        Terminal results are immutable when another worker returns late.
+        """
         if state not in VALID_STATUSES or state == "ACTIVE":
             raise MonitorError("Invalid result state")
         db=self.db()
         try:
             db.execute("BEGIN IMMEDIATE")
             row=db.execute("SELECT state FROM watches WHERE watch_id=?",(watch_id,)).fetchone()
+            if expected_revision is not None:
+                revision=db.execute("SELECT MAX(id) FROM events WHERE watch_id=?",(watch_id,)).fetchone()[0]
+                if revision != expected_revision:
+                    db.commit();return False
+            if row is not None and row["state"] in ("FILLED","REJECTED","CANCELLED","EXPIRED"):
+                db.commit();return False
             if row is None or row["state"] not in ("CLAIMED","UNKNOWN","ACKNOWLEDGED"):
                 raise MonitorError("Only outstanding watch can receive a broker receipt")
             if state not in ("UNKNOWN","ACKNOWLEDGED","FILLED","REJECTED","CANCELLED","EXPIRED"):
@@ -166,6 +178,7 @@ class MonitorLedger:
             db.execute("INSERT INTO events(watch_id,at,kind,detail) VALUES(?,?,?,?)",
                        (watch_id,now,state,json.dumps(receipt,sort_keys=True,default=str)))
             db.commit()
+            return True
         except:
             db.rollback();raise
         finally:db.close()
@@ -230,15 +243,17 @@ async def monitor_once(ledger, position_provider, submit_exit, reconcile_intent)
     submit_exit(ticker, available_quantity, stable_intent_id) must call the durable method.
     Without broker position/price evidence no exit order is sent.
     """
-    outcome={"checked":0,"triggered":0,"submitted":0,"reconciled":0,"unavailable":[]}
+    outcome={"checked":0,"triggered":0,"submitted":0,"reconciled":0,"stale_receipts":0,"unavailable":[]}
     pending=ledger.rows(("CLAIMED","UNKNOWN","ACKNOWLEDGED"))
     for row in pending:
         # Broker reconciliation is always attempted before any new action.
         try:
             receipt=await reconcile_intent(row["intent_id"])
             state,data=normalized_receipt(receipt)
-            ledger.record(row["watch_id"],state,data)
-            outcome["reconciled"]+=1
+            if ledger.record(row["watch_id"],state,data,expected_revision=row["revision"]):
+                outcome["reconciled"]+=1
+            else:
+                outcome["stale_receipts"]+=1
         except Exception as exc:
             outcome["unavailable"].append({"watch_id":row["watch_id"],"reason":type(exc).__name__})
     active=ledger.rows(("ACTIVE",))
