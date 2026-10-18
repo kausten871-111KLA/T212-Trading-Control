@@ -13,7 +13,7 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
         self.tmp=tempfile.TemporaryDirectory(); path=Path(self.tmp.name)/'state.db'; migrate(path)
         self.db=StateDB(str(path)); self.aid=next(iter(PHASE_BY_AUTOMATION))
         self.user=SimpleNamespace(id='owner')
-        self.automation=SimpleNamespace(id=self.aid,user_id='owner',data={'model_id':MODEL_ID})
+        self.automation=SimpleNamespace(id=self.aid,user_id='owner',is_active=True,data={'model_id':MODEL_ID})
         self.allowed=True
         async def load(aid): return self.automation
         async def permitted(user): return self.allowed
@@ -39,3 +39,7 @@ class IngressTests(unittest.IsolatedAsyncioTestCase):
     async def test_naive_time_rejected(self):
         self.at=self.at.replace(tzinfo=None)
         with self.assertRaises(ValueError): await self.call()
+
+    async def test_paused_automation_rejected(self):
+        self.automation.is_active=False
+        with self.assertRaises(PermissionError): await self.call()

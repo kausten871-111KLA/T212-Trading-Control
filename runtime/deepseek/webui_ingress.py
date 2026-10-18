@@ -23,6 +23,8 @@ class WebUIAutomationIngress:
         automation = await self.load_automation(automation_id)
         if automation is None or automation.id != automation_id:
             raise PermissionError('Automation no longer exists')
+        if getattr(automation, 'is_active', False) is not True:
+            raise PermissionError('Automation is paused')
         if authenticated_user is None or authenticated_user.id != automation.user_id:
             raise PermissionError('Automation owner mismatch')
         if await self.owner_permitted(authenticated_user) is not True:
@@ -37,3 +39,22 @@ class WebUIAutomationIngress:
             principal is authenticated_user and aid == automation.id)
         return bridge.enqueue(automation_id=automation_id, market_date=market_date,
                               principal=authenticated_user)
+
+
+def installed_webui_ingress(db):
+    """Bind verified WebUI 0.11.4 APIs inside its authenticated host process."""
+    from open_webui.models.automations import Automations
+    from open_webui.models.users import Users
+    from open_webui.models.config import Config
+    from open_webui.utils.access_control import has_permission
+
+    async def permitted(principal):
+        # Rehydrate current role/permissions; stale principal objects aren't enough.
+        current = await Users.get_user_by_id(principal.id)
+        if current is None or current.role not in ('user', 'admin'):
+            return False
+        return current.role == 'admin' or await has_permission(
+            current.id, 'features.automations', await Config.get('user.permissions'))
+
+    return WebUIAutomationIngress(db, load_automation=Automations.get_by_id,
+                                  owner_permitted=permitted)

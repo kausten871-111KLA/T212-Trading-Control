@@ -13,7 +13,7 @@ model's tools and invokes `app.state.CHAT_COMPLETION_HANDLER`.
 and permission callback must use the actual installed WebUI models/permissions;
 do not expose caller-supplied callbacks, user IDs or schedule dates as credentials.
 The installed AutomationTable does NOT have `get_automation_by_id`; bind the
-real method after inspection, rather than copying a guessed API signature.
+verified `Automations.get_by_id` method, as `installed_webui_ingress` now does.
 Preserve the original scheduled occurrence on retries. Invoke exactly one
 completion pipeline; do not run both the legacy path and a new outbox consumer.
 
