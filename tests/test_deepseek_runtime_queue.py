@@ -41,7 +41,7 @@ class RuntimeQueueTests(unittest.TestCase):
         self.db.emit('EXECUTE_ORDER',{});old=self.db.claim('a',('EXECUTE_ORDER',))[0]
         self.db.conn.execute('UPDATE event_queue SET lease_expires_at=0');self.db.conn.commit()
         self.assertFalse(self.db.complete(old['id'],'a',old['claim_token']))
-        self.assertEqual(self.db.requeue_dead(),1)
+        self.assertEqual(self.db.requeue_dead(('EXECUTE_ORDER',)),1)
         new=self.db.claim('a',('EXECUTE_ORDER',))[0]
         self.assertNotEqual(old['claim_token'],new['claim_token'])
         self.assertFalse(self.db.fail(old['id'],'a',old['claim_token'],'stale'))
