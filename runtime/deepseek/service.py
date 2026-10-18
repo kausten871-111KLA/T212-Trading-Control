@@ -67,10 +67,21 @@ class PhaseService:
                 if not {'idx_worker_one_active_role', 'idx_ctl_result_phase_event', 'idx_controller_ack_once'} <= indexes:
                     raise RuntimeError('Runtime migration incomplete')
                 worker = ControllerPhaseWorker(db, WorkerSupervisor(db))
+                last_report = 0
                 while not self.stop.is_set():
-                    counts = worker.run_once()
-                    print(json.dumps({'component': 'phase_dispatcher', 'counts': counts,
-                        'trading_ready': False}), flush=True)
+                    now = time.time()
+                    phases = tuple(sorted(worker.dispatcher.EVENT_TYPES))
+                    marks = ','.join('?' for _ in phases)
+                    due = db.conn.execute(
+                        "SELECT 1 FROM event_queue WHERE event_type IN (" + marks + ") AND "
+                        "((status='pending' AND (next_retry_at IS NULL OR next_retry_at<=?)) "
+                        "OR (status='claimed' AND lease_expires_at<=?)) LIMIT 1",
+                        (*phases, now, now)).fetchone()
+                    counts = worker.run_once() if due else {'claimed': 0, 'dispatched': 0}
+                    if due or now - last_report >= 60:
+                        print(json.dumps({'component': 'phase_dispatcher', 'counts': counts,
+                            'trading_ready': False}), flush=True)
+                        last_report = now
                     if once:
                         break
                     self.stop.wait(interval)
