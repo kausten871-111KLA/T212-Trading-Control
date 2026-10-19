@@ -19,6 +19,7 @@ from .worker_supervisor import WorkerSupervisor
 from .controller_worker import ControllerPhaseWorker
 from .controller_dispatch import ControllerPhaseDispatcher
 from .controller_ack import ControllerAcknowledgements
+from .model_invocation_gate import ModelInvocationGate
 
 
 def migrate(path):
@@ -39,6 +40,8 @@ def migrate(path):
         WorkerSupervisor(db).install_schema()
         ControllerPhaseDispatcher(db).install_schema()
         ControllerAcknowledgements(db, lambda *_: False).install_schema()
+        ModelInvocationGate(db, authorizer=lambda *_: False,
+                            verify_terminal=lambda *_: False).install_schema()
         if db.conn.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
             raise RuntimeError('Runtime integrity check failed')
     finally:
@@ -64,7 +67,9 @@ class PhaseService:
             db = StateDB(str(self.path))
             try:
                 indexes = {r[0] for r in db.conn.execute("SELECT name FROM sqlite_master WHERE type='index'")}
-                if not {'idx_worker_one_active_role', 'idx_ctl_result_phase_event', 'idx_controller_ack_once'} <= indexes:
+                if not {'idx_worker_one_active_role', 'idx_ctl_result_phase_event',
+                        'idx_controller_ack_once', 'idx_model_invocation_claim_once',
+                        'idx_model_invocation_result_once'} <= indexes:
                     raise RuntimeError('Runtime migration incomplete')
                 worker = ControllerPhaseWorker(db, WorkerSupervisor(db))
                 last_report = 0
