@@ -63,7 +63,7 @@ class TestWebUIAutomationToolContract(unittest.TestCase):
         self.assertIsNone(capability_manifest(self.result(tools={})))
     def test_artifact_patch_files_present(self):
         directory = Path(__file__).resolve().parents[1] / "deploy/deepseek/webui_tool_binding"
-        self.assertIn("_resolve_model_defaults", (directory/"automations.patch").read_text())
+        self.assertIn("persisted_tool_ids", (directory/"automations.patch").read_text())
         self.assertIn("capability_manifest", (directory/"middleware.patch").read_text())
 
 if __name__=="__main__":
