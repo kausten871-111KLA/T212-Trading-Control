@@ -25,7 +25,7 @@ STATE = Path("/home/katie/.local/state/deepseek-runtime/trading_state.db")
 ACCEPTANCE = REPO / "deploy/deepseek/webui_tool_binding/scheduled_open_acceptance.py"
 NETWORK = ipaddress.ip_network("172.18.0.0/16")
 COMMANDS = frozenset({"runtime_status","webui_health","open_acceptance",
-                       "repo_revision","data_key_status"})
+                       "repo_revision","data_key_status","alpha_vantage_daily"})
 
 def _run(args, timeout=8):
     p = subprocess.run(args, capture_output=True, text=True, timeout=timeout,
@@ -33,9 +33,12 @@ def _run(args, timeout=8):
     return {"ok": p.returncode == 0, "exit_code": p.returncode,
             "output": p.stdout[:7000], "stderr_type": "nonempty" if p.stderr else "empty"}
 
-def execute(command):
+def execute(command, symbol="IBM"):
     if not isinstance(command, str) or command not in COMMANDS:
         return {"ok": False, "error": "unknown_command", "allowed_commands": sorted(COMMANDS)}
+    if command == "alpha_vantage_daily":
+        from .alpha_vantage_data import daily_bars
+        return daily_bars(symbol)
     if command == "repo_revision":
         p=_run(["git","rev-parse","HEAD"])
         return {"ok":p["ok"],"revision":p["output"].strip()[:40]}
@@ -117,7 +120,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError,UnicodeDecodeError):
             return self.respond(400,{"ok":False,"error":"invalid_json"})
         try:
-            return self.respond(200,execute(payload.get("command")))
+            return self.respond(200,execute(payload.get("command"), payload.get("symbol", "IBM")))
         except Exception as error:
             return self.respond(500,{"ok":False,"error_type":type(error).__name__})
 

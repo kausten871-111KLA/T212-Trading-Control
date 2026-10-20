@@ -30,17 +30,19 @@ class Tools:
         self,
         command: Literal[
             "runtime_status", "webui_health", "open_acceptance",
-            "repo_revision", "data_key_status"
+            "repo_revision", "data_key_status", "alpha_vantage_daily"
         ] = "runtime_status",
+        symbol: str = "IBM",
     ) -> str:
         """Invoke one predefined Contabo operation and return verified host output.
 
         :param command: Select runtime_status, webui_health, open_acceptance, repo_revision,
-        or data_key_status. No free-form shell commands or trading orders.
+        data_key_status or alpha_vantage_daily. No free-form shell or orders.
+        :param symbol: Market symbol, e.g. IBM or TSCO.LON, for alpha_vantage_daily only.
         """
         permitted = {
             "runtime_status", "webui_health", "open_acceptance",
-            "repo_revision", "data_key_status"
+            "repo_revision", "data_key_status", "alpha_vantage_daily"
         }
         if command not in permitted:
             return json.dumps({"ok": False, "error": "command_not_allowed"})
@@ -54,7 +56,7 @@ class Tools:
             async with httpx.AsyncClient(timeout=45, trust_env=False, transport=httpx.AsyncHTTPTransport(uds=url)) as client:
                 response = await client.post(
                     "http://localhost/command",
-                    json={"command": command},
+                    json={"command": command, "symbol": symbol},
                     headers={"X-Bridge-Token": token, "Accept": "application/json"},
                 )
                 return response.text[:15000] if response.status_code == 200 else json.dumps(
