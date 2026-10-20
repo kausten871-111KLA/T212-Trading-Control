@@ -20,6 +20,7 @@ from .controller_worker import ControllerPhaseWorker
 from .controller_dispatch import ControllerPhaseDispatcher
 from .controller_ack import ControllerAcknowledgements
 from .model_invocation_gate import ModelInvocationGate
+from .webui_run_observer import VerifiedScheduledRunObserver
 
 
 def migrate(path):
@@ -42,6 +43,7 @@ def migrate(path):
         ControllerAcknowledgements(db, lambda *_: False).install_schema()
         ModelInvocationGate(db, authorizer=lambda *_: False,
                             verify_terminal=lambda *_: False).install_schema()
+        VerifiedScheduledRunObserver(db).install_schema()
         if db.conn.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
             raise RuntimeError('Runtime integrity check failed')
     finally:
@@ -72,9 +74,40 @@ class PhaseService:
                         'idx_model_invocation_result_once'} <= indexes:
                     raise RuntimeError('Runtime migration incomplete')
                 worker = ControllerPhaseWorker(db, WorkerSupervisor(db))
+                observer = VerifiedScheduledRunObserver(db)
+                print(json.dumps({'component': 'phase_dispatcher', 'counts': {
+                    'claimed': 0, 'dispatched': 0}, 'trading_ready': False,
+                    'observer_state': 'initialising'}),flush=True)
+                observer_available = False
                 last_report = 0
+                last_observer_scan = 0
+                if not once:
+                    try:
+                        baseline = observer.initialise_from_existing_runs()
+                        observer_available = True
+                        print(json.dumps({'component': 'webui_run_observer',
+                            'baseline_ns': baseline,
+                            'scheduler_source': 'existing_WebUI_only'}),flush=True)
+                    except Exception as error:
+                        print(json.dumps({'component': 'webui_run_observer',
+                            'initialisation_error_type':type(error).__name__,
+                            'trading_ready':False}),flush=True)
                 while not self.stop.is_set():
                     now = time.time()
+                    if not once and now-last_observer_scan >= 25:
+                        try:
+                            if not observer_available:
+                                observer.initialise_from_existing_runs()
+                                observer_available=True
+                            observed = observer.consume(worker=worker)
+                            if observed['recorded'] or observed['eligible']:
+                                print(json.dumps({'component':'webui_run_observer',
+                                    'events':observed}),flush=True)
+                        except Exception as error:
+                            print(json.dumps({'component':'webui_run_observer',
+                                'error_type':type(error).__name__,
+                                'trading_ready':False}),flush=True)
+                        last_observer_scan=now
                     phases = tuple(sorted(worker.dispatcher.EVENT_TYPES))
                     marks = ','.join('?' for _ in phases)
                     due = db.conn.execute(
@@ -84,8 +117,11 @@ class PhaseService:
                         (*phases, now, now)).fetchone()
                     counts = worker.run_once() if due else {'claimed': 0, 'dispatched': 0}
                     if due or now - last_report >= 60:
+                        evidence = observer.evidence()
                         print(json.dumps({'component': 'phase_dispatcher', 'counts': counts,
-                            'trading_ready': False}), flush=True)
+                            'verified_webui_schedule':evidence['webui_schedule_connected'],
+                            'recent_broker_runs':evidence['recent_broker_runs'],
+                            'trading_ready': evidence['recent_broker_runs']>0}), flush=True)
                         last_report = now
                     if once:
                         break

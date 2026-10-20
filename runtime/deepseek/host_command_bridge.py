@@ -33,6 +33,26 @@ def _run(args, timeout=8):
     return {"ok": p.returncode == 0, "exit_code": p.returncode,
             "output": p.stdout[:7000], "stderr_type": "nonempty" if p.stderr else "empty"}
 
+def _verified_demo_schedule_ready():
+    # No manual switch: true only after a recent, authenticated saved WebUI
+    # automation completes with an actual T212 function output, persisted by
+    # the phase worker and linked to an idempotent controller ACK.
+    if not STATE.is_file():
+        return False
+    try:
+        with sqlite3.connect("file:"+str(STATE)+"?mode=ro",uri=True,timeout=3) as db:
+            row=db.execute(
+                "SELECT 1 FROM webui_run_receipt r "
+                "JOIN controller_instruction i ON i.id=r.instruction_id "
+                "WHERE r.broker_tool_results>0 AND r.recorded_at>=? "
+                "AND i.status='acknowledged' LIMIT 1",
+                (int(__import__('time').time())-86400,)
+            ).fetchone()
+            return row is not None
+    except sqlite3.Error:
+        return False
+
+
 def execute(command, symbol="IBM"):
     if not isinstance(command, str) or command not in COMMANDS:
         return {"ok": False, "error": "unknown_command", "allowed_commands": sorted(COMMANDS)}
@@ -69,7 +89,7 @@ def execute(command, symbol="IBM"):
                 counts=dict(c.execute("SELECT status,count(*) FROM event_queue GROUP BY status").fetchall())
         return {"ok":active,"service":"deepseek-phase.service",
                 "service_active":active,"queued_phase_events":counts,
-                "trading_ready":False,"live_trading_enabled_by_bridge":False}
+                "trading_ready":_verified_demo_schedule_ready(), "live_trading_enabled_by_bridge":False}
     if command == "open_acceptance":
         cmd=["docker","run","--rm","--network","none","--read-only",
              "--security-opt","no-new-privileges",
