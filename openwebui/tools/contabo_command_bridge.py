@@ -5,6 +5,7 @@ description: Authenticated named operations on the user's Contabo host. No shell
 version: 0.1.0
 """
 import json
+from pathlib import Path
 from typing import Literal
 import httpx
 from pydantic import BaseModel, Field
@@ -44,7 +45,7 @@ class Tools:
         if command not in permitted:
             return json.dumps({"ok": False, "error": "command_not_allowed"})
         url = self.valves.endpoint.strip()
-        token = self.valves.bridge_token.strip()
+        token = Path("/run/contabo-bridge/bridge.token").read_text().strip()
         if not token:
             return json.dumps({"ok": False, "error": "bridge_token_not_configured"})
         if url != "/run/contabo-bridge/command.sock":
