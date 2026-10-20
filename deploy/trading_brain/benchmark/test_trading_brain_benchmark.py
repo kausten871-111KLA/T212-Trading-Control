@@ -92,5 +92,3 @@ def test_no_executable_automation_or_broker_import():
     assert "requests" not in text
     assert "trading_212_demo_gateway" not in text
     assert "openai import" not in text
-
-[executed on device: LAPTOP-G6NV74D9 (2d336a84-6ac5-4468-910d-1e24eb282312)]

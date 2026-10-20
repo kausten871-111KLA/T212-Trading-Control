@@ -207,5 +207,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-[executed on device: LAPTOP-G6NV74D9 (2d336a84-6ac5-4468-910d-1e24eb282312)]
