@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from urllib.parse import parse_qs,urlparse
 
-from twelve_data_adapter import query, _key, MAX_LOCAL_PER_MINUTE
+from runtime.deepseek.twelve_data_adapter import query, _key, MAX_LOCAL_PER_MINUTE
 
 
 class FakeResponse:
