@@ -25,7 +25,9 @@ STATE = Path("/home/katie/.local/state/deepseek-runtime/trading_state.db")
 ACCEPTANCE = REPO / "deploy/deepseek/webui_tool_binding/scheduled_open_acceptance.py"
 NETWORK = ipaddress.ip_network("172.18.0.0/16")
 COMMANDS = frozenset({"runtime_status","webui_health","open_acceptance",
-                       "repo_revision","data_key_status","alpha_vantage_daily"})
+                       "repo_revision","data_key_status","alpha_vantage_daily",
+                       "twelve_data_quote","twelve_data_series",
+                       "twelve_data_search","twelve_data_usage"})
 
 def _run(args, timeout=8):
     p = subprocess.run(args, capture_output=True, text=True, timeout=timeout,
@@ -53,9 +55,20 @@ def _verified_demo_schedule_ready():
         return False
 
 
-def execute(command, symbol="IBM"):
+def execute(command, symbol="IBM", exchange="", mic_code="", interval="1day",
+            outputsize=30):
     if not isinstance(command, str) or command not in COMMANDS:
         return {"ok": False, "error": "unknown_command", "allowed_commands": sorted(COMMANDS)}
+    if command.startswith("twelve_data_"):
+        from .twelve_data_adapter import query
+        operation = {
+            "twelve_data_quote": "quote",
+            "twelve_data_series": "time_series",
+            "twelve_data_search": "symbol_search",
+            "twelve_data_usage": "api_usage",
+        }[command]
+        return query(operation,symbol=symbol,exchange=exchange,
+                     mic_code=mic_code,interval=interval,outputsize=outputsize)
     if command == "alpha_vantage_daily":
         from .alpha_vantage_data import daily_bars
         return daily_bars(symbol)
@@ -140,7 +153,13 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError,UnicodeDecodeError):
             return self.respond(400,{"ok":False,"error":"invalid_json"})
         try:
-            return self.respond(200,execute(payload.get("command"), payload.get("symbol", "IBM")))
+            return self.respond(200,execute(
+                payload.get("command"), payload.get("symbol", "IBM"),
+                exchange=payload.get("exchange", ""),
+                mic_code=payload.get("mic_code", ""),
+                interval=payload.get("interval", "1day"),
+                outputsize=payload.get("outputsize", 30),
+            ))
         except Exception as error:
             return self.respond(500,{"ok":False,"error_type":type(error).__name__})
 

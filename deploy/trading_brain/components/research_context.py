@@ -23,6 +23,7 @@ ALLOWED_FIELDS = (
     "ticker", "price", "change_pct", "day_volume", "bid", "ask",
     "spread_pct", "exchange", "vwap", "rvol", "catalyst", "stale",
     "quote_time_utc", "trade_time_utc", "source", "source_tier",
+    "mic_code", "currency", "exchange_timezone", "provider_market_datetime",
 )
 MAX_BARS = 800
 MAX_MEMORIES = 20
