@@ -48,14 +48,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install gateway test dependencies
-        run: python -m pip install -r requirements-ci.txt
+      - name: Install gateway and Trading Brain schema-test dependencies
+        run: |
+          python -m pip install -r requirements-ci.txt
+          python -m pip install 'pydantic>=2.0,<3'
 
       - name: Compile Python sources
-        run: python -m compileall -q openwebui worker runtime scripts tests
+        run: python -m compileall -q openwebui worker runtime scripts tests deploy/trading_brain/components
 
       - name: Run complete unit suite
         run: python -m unittest discover -s tests
+
+      - name: Run Trading Brain research-contract suite
+        run: python -m unittest discover -s deploy/trading_brain/components -p 'test_*.py' -q
 
       - name: Run control-plane preflight
         run: python scripts/verify_webui_control.py
