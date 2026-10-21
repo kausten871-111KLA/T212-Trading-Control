@@ -11,6 +11,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 from research_context import compile_context
+from market_gateway_normalizer import normalise_snapshot, normalise_bars
 
 MAX_SNAPSHOT_CHARS = 60_000
 MAX_DECISION_CHARS = 12_000
@@ -61,8 +62,10 @@ class Tools:
                 raise ValueError("snapshot must be a JSON object")
             if not isinstance(decision, dict):
                 raise ValueError("decision must be a JSON object")
-            if not isinstance(bars, list):
-                raise ValueError("bars must be a JSON array")
+            # Retain exact quote/trade timestamps and source provenance.
+            # Never manufacture RVOL, VWAP, exchange or a news catalyst.
+            raw = normalise_snapshot(raw, ticker=ticker, as_of_utc=as_of_utc)
+            bars = normalise_bars(bars, ticker=ticker)
             if not 1 <= scenario_quantity <= 100_000:
                 raise ValueError("scenario_quantity must be 1..100000")
             if average_daily_volume is not None and average_daily_volume <= 0:

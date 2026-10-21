@@ -134,6 +134,8 @@ def compile_context(
         "market_observation_time_utc": observed,
         "as_of_utc": now,
         "data_source_claim": source,
+        "observation_time_is_caller_supplied": bool(
+            data.get("source_capture_time_supplied_by_caller")),
         "source_raw_receipt_independently_verified": False,
         "observation": factual,
     }
@@ -160,6 +162,8 @@ def compile_context(
         key for key in ("exchange", "price", "bid", "ask", "rvol", "vwap")
         if row.get(key) is None
     ]
+    if data.get("source_capture_time_supplied_by_caller"):
+        source_missing.append("provider_attested_snapshot_capture_time")
     if not quote_ts:
         source_missing.append("timestamped_bid_ask_quote")
     if not trade_ts:
