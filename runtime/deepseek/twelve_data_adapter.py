@@ -151,6 +151,43 @@ def _cred_safe_result(kind, symbol, resp, headers, now):
     return common
 
 
+
+def _safe_http_error_details(error):
+    """Classify provider HTTP error bodies without echoing messages or credentials.
+
+    HTTP 404 alone cannot distinguish a missing instrument, exchange-specific
+    coverage or a plan issue. Never surface raw provider text or request URL.
+    """
+    data = {}
+    try:
+        raw = error.read(4097)
+        if len(raw) > 4096:
+            return data
+        body = json.loads(raw.decode("utf-8"))
+        if not isinstance(body, dict):
+            return data
+        code = body.get("code")
+        if type(code) is int and 100 <= code <= 599:
+            data["http_provider_code"] = code
+        msg = body.get("message")
+        if not isinstance(msg, str):
+            return data
+        msg = msg.lower()[:700]
+        if any(v in msg for v in ("subscription", "upgrade", "plan", "entitlement", "not included", "not available on")):
+            kind = "possible_plan_entitlement"
+        elif any(v in msg for v in ("exchange", "mic_code", "market identifier")):
+            kind = "possible_exchange_coverage"
+        elif any(v in msg for v in ("symbol", "instrument", "ticker")):
+            kind = "possible_instrument_coverage"
+        elif any(v in msg for v in ("rate limit", "credits", "too many")):
+            kind = "possible_rate_limit"
+        else:
+            kind = "unclassified_provider_response"
+        data["provider_error_category"] = kind
+    except (OSError, ValueError, UnicodeDecodeError):
+        pass
+    return data
+
 def query(kind, symbol="AAPL", *, exchange=None, mic_code=None,
           interval="1day", outputsize=30, key_file=KEY_FILE,
           db_file=DB_FILE, fetch=urlopen, clock=time.time):
@@ -231,10 +268,12 @@ def query(kind, symbol="AAPL", *, exchange=None, mic_code=None,
             response=json.loads(raw.decode("utf-8"))
             headers=result.headers
     except HTTPError as error:
+        details = _safe_http_error_details(error)
         return {"ok":False,"error":"provider_http_error",
                 "provider":"Twelve Data","http_status":error.code,
-                "entitlement_or_plan_may_be_required":error.code==403,
-                "rate_limit_reached":error.code==429}
+                "entitlement_or_plan_may_be_required":error.code==403 or details.get("provider_error_category")=="possible_plan_entitlement",
+                "rate_limit_reached":error.code==429,
+                **details}
     except (URLError,TimeoutError,OSError,ValueError,UnicodeDecodeError) as error:
         return {"ok":False,"error":"provider_connection_or_format_error",
                 "provider":"Twelve Data","error_type":type(error).__name__}
