@@ -136,6 +136,33 @@ class TwelveDataTest(unittest.TestCase):
         self.assertFalse(r["ok"])
         self.assertTrue(r["entitlement_or_plan_may_be_required"])
 
+    def test_http_404_body_is_classified_without_leaking_message(self):
+        from urllib.error import HTTPError
+        import io
+        secret = "KEYDO-NOT-PRINT-123"
+        body = json.dumps({"status":"error","code":404,
+                           "message":"Symbol TSCO not supported on exchange LSE. "+secret}).encode()
+        def rejected(*args,**kwargs):
+            raise HTTPError("https://api.twelvedata.com/quote",404,"Not Found",None,io.BytesIO(body))
+        result = query("quote", symbol="TSCO", fetch=rejected, mic_code="XLON",
+                       key_file=self.key_file, db_file=self.db_file, clock=self.clock)
+        self.assertEqual(result["http_status"],404)
+        self.assertEqual(result["http_provider_code"],404)
+        self.assertEqual(result["provider_error_category"],"possible_exchange_coverage")
+        self.assertNotIn(secret,json.dumps(result))
+
+    def test_http_404_plan_body_is_not_called_success(self):
+        from urllib.error import HTTPError
+        import io
+        def rejected(*args,**kwargs):
+            raise HTTPError("https://api.twelvedata.com/quote",404,"Not Found",None,
+                            io.BytesIO(json.dumps({"code":404,"message":"Please upgrade your plan for this exchange"}).encode()))
+        result = query("quote", symbol="TSCO", fetch=rejected, exchange="LSE",
+                       key_file=self.key_file, db_file=self.db_file, clock=self.clock)
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["entitlement_or_plan_may_be_required"])
+        self.assertEqual(result["provider_error_category"],"possible_plan_entitlement")
+
     def test_provider_error_403_does_not_leak_secret(self):
         def fail(*args,**kw):
             return FakeResponse({"status":"error","code":403,
