@@ -66,7 +66,7 @@ class WebUIDstAPITests(unittest.TestCase):
         self.api.fail_on="3"
         with self.assertRaises(RuntimeError):
             apply_five_job_plan(self.api,self.plan)
-        self.assertEqual([self.api.get(x["id"]) for x in self.initial],self.initial)
+        self.assertEqual([self.api.data[x["id"]] for x in self.initial],self.initial)
 
     def test_no_mutation_if_rrule_changed(self):
         self.api.data["1"]["data"]["rrule"]="RRULE:FREQ=DAILY;BYHOUR=8;BYMINUTE=0"
