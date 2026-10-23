@@ -1,7 +1,9 @@
 import copy
 import unittest
 from runtime.deepseek.webui_dst_api_client import apply_five_job_plan, form_of
-from runtime.deepseek.webui_dst_migration import prepare_dst_plan
+from runtime.deepseek.webui_dst_migration import prepare_dst_plan, PHASE_FOR_NAME
+from runtime.deepseek.us_session_dst_audit import uk_target
+from datetime import date
 
 NAMES=[
  ("US OPEN — Trading Operations (DEMO)",14,35,"WEEKLY"),
@@ -25,7 +27,13 @@ class FakeAPI:
         self.fail_on=None
 
     def get(self,aid):
-        return copy.deepcopy(self.data[aid])
+        row=copy.deepcopy(self.data[aid])
+        phase=PHASE_FOR_NAME[row["name"]]
+        monday=uk_target(date(2026,10,26),phase)
+        restored=uk_target(date(2026,11,2),phase)
+        expected=monday if f"BYHOUR={monday.hour};" in row["data"]["rrule"] else restored
+        row["next_runs"]=[int(expected.timestamp()*1_000_000_000)]
+        return row
 
     def update(self,aid,form):
         self.updates.append(aid)
@@ -46,7 +54,7 @@ class WebUIDstAPITests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(len(result["updated_ids"]),5)
         self.assertEqual(apply_five_job_plan(self.api,self.plan,restore=True)["restored"],True)
-        self.assertEqual([self.api.get(x["id"]) for x in self.initial],self.initial)
+        self.assertEqual([self.api.data[x["id"]] for x in self.initial],self.initial)
 
     def test_no_mutation_if_one_model_differs(self):
         self.api.data["2"]["data"]["model_id"]="wrong"
