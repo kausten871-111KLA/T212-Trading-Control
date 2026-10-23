@@ -86,14 +86,14 @@ def apply_five_job_plan(api, plan, *, restore=False):
         for p in plan:
             aid=p["automation_id"]
             new_form={**before[aid],"data":{**before[aid]["data"],"rrule":p[desired_key]}}
+            # Record the attempted mutation BEFORE the network call: a timeout
+            # may occur after the server has already persisted the new rule.
+            changed.append(aid)
             response=api.update(aid,new_form)
             if (response.get("id")!=aid or
                 response.get("data",{}).get("rrule")!=p[desired_key] or
                 response.get("is_active") is not True):
-                # This update may have persisted despite a bad response.
-                changed.append(aid)
                 raise RuntimeError("WebUI update acceptance mismatch")
-            changed.append(aid)
             observed=api.get(aid)
             if observed.get("data",{}).get("rrule")!=p[desired_key]:
                 raise RuntimeError("WebUI persisted RRULE mismatch")
