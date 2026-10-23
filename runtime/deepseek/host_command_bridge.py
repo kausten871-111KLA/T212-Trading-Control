@@ -1,8 +1,10 @@
 """Authenticated, fixed-command Contabo bridge for Open WebUI.
 
-There is deliberately no shell/argv/path input from the model. The only
-accepted commands are named operations implemented below. No broker orders,
-model invocations, schedule edits, filesystem writes, or trade decisions.
+There is deliberately no shell/argv/path input from the model. The existing
+/command route accepts only fixed operations. The optional /model-task route
+uses a DIFFERENT dedicated token and only creates/reads/cancels persistent
+non-broker research tasks. It fails closed until separately provisioned.
+No model inference, broker orders, schedule edits or trade decisions here.
 """
 import hmac
 import ipaddress
@@ -131,7 +133,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(blob)
     def do_POST(self):
-        if self.path!="/command":
+        model_task = self.path == "/model-task"
+        if self.path not in ("/command", "/model-task"):
             return self.respond(404,{"ok":False,"error":"not_found"})
         try:
             addr=ipaddress.ip_address(self.client_address[0])
@@ -141,11 +144,21 @@ class Handler(BaseHTTPRequestHandler):
             allowed = True
         if not allowed:
             return self.respond(403,{"ok":False,"error":"source_forbidden"})
-        supplied=self.headers.get("X-Bridge-Token","")
-        if not supplied or not hmac.compare_digest(supplied,TOKEN):
-            return self.respond(401,{"ok":False,"error":"not_authorized"})
+        if model_task:
+            # Dedicated secret: the general bridge token must not authorize
+            # model-created persistent work. Fail closed until provisioned.
+            expected=os.environ.get("CONTABO_MODEL_TASK_TOKEN","")
+            supplied=self.headers.get("X-Model-Task-Token","")
+            if len(expected)<48:
+                return self.respond(503,{"ok":False,"error":"model_task_not_configured"})
+            if not supplied or not hmac.compare_digest(supplied,expected):
+                return self.respond(401,{"ok":False,"error":"not_authorized"})
+        else:
+            supplied=self.headers.get("X-Bridge-Token","")
+            if not supplied or not hmac.compare_digest(supplied,TOKEN):
+                return self.respond(401,{"ok":False,"error":"not_authorized"})
         length=int(self.headers.get("Content-Length","0") or 0)
-        if length < 2 or length > 1024:
+        if length < 2 or length > (16384 if model_task else 1024):
             return self.respond(413,{"ok":False,"error":"invalid_length"})
         try:
             payload=json.loads(self.rfile.read(length))
@@ -153,6 +166,9 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError,UnicodeDecodeError):
             return self.respond(400,{"ok":False,"error":"invalid_json"})
         try:
+            if model_task:
+                from .model_task_host_commands import dispatch_model_task
+                return self.respond(200,dispatch_model_task(payload,verified=True))
             return self.respond(200,execute(
                 payload.get("command"), payload.get("symbol", "IBM"),
                 exchange=payload.get("exchange", ""),
@@ -160,6 +176,9 @@ class Handler(BaseHTTPRequestHandler):
                 interval=payload.get("interval", "1day"),
                 outputsize=payload.get("outputsize", 30),
             ))
+        except (PermissionError, ValueError) as error:
+            return self.respond(403 if isinstance(error,PermissionError) else 400,
+                                {"ok":False,"error_type":type(error).__name__})
         except Exception as error:
             return self.respond(500,{"ok":False,"error_type":type(error).__name__})
 
