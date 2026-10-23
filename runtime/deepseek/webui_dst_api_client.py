@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 import json
 from urllib.request import Request, urlopen
 from .webui_dst_migration import PHASE_FOR_NAME
+from .us_session_dst_audit import uk_target
+from datetime import date
 
 FIELDS=("name","folder_id","data","meta","is_active")
 
@@ -97,6 +99,16 @@ def apply_five_job_plan(api, plan, *, restore=False):
             observed=api.get(aid)
             if observed.get("data",{}).get("rrule")!=p[desired_key]:
                 raise RuntimeError("WebUI persisted RRULE mismatch")
+            # WebUI 0.12.3 returns next_runs as UTC epoch nanoseconds.
+            # Confirm that the Monday 26 Oct (or 2 Nov restoration) session
+            # occurs at the intended NY-aligned UK time, not merely that
+            # a string was persisted in SQLite.
+            phase=PHASE_FOR_NAME[p["name"]]
+            target=uk_target(date(2026,11,2) if restore else date(2026,10,26),phase)
+            target_ns=int(target.timestamp()*1_000_000_000)
+            next_runs=observed.get("next_runs")
+            if not isinstance(next_runs,list) or target_ns not in next_runs:
+                raise RuntimeError("WebUI next-run timezone acceptance failed")
         return {"ok":True,"restored":restore,"updated_ids":changed}
     except Exception as error:
         rollback_errors=[]
