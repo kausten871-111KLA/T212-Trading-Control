@@ -8,7 +8,7 @@ from .model_task_queue import MODEL_ID, TIERS, run_due_once
 
 
 class DeepSeekTaskHandler:
-    def __init__(self, *, invoke_model, model_routes, allow_pro=True):
+    def __init__(self, *, invoke_model, model_routes, allow_pro=False):
         if not callable(invoke_model):
             raise ValueError("Existing authenticated inference callback required")
         if not isinstance(model_routes,dict) or set(model_routes)!=TIERS:
@@ -50,7 +50,7 @@ class DeepSeekTaskHandler:
 
 
 def run_existing_worker_cycle(queue, *, worker_id, invoke_model, model_routes,
-                              allow_pro=True, now_utc=None):
+                              allow_pro=False, now_utc=None):
     """Call only from the existing host controller's supervised cycle.
 
     Running this function is NOT evidence that WebUI background inference is
