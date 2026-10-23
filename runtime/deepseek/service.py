@@ -53,9 +53,17 @@ def migrate(path):
 
 
 class PhaseService:
-    def __init__(self, path):
+    def __init__(self, path, *, model_task_cycle=None):
+        """Optional trusted callback; main() leaves it unregistered by default.
+
+        A host-integrated worker may inject the existing queue's due-task
+        cycle here. This does NOT grant autonomous inference on its own.
+        """
+        if model_task_cycle is not None and not callable(model_task_cycle):
+            raise TypeError('model_task_cycle must be a trusted callable')
         self.path = Path(path).resolve()
         self.stop = threading.Event()
+        self.model_task_cycle = model_task_cycle
 
     def run(self, *, interval=1.0, once=False):
         if not 0 < interval <= 60:
@@ -81,6 +89,7 @@ class PhaseService:
                 observer_available = False
                 last_report = 0
                 last_observer_scan = 0
+                last_model_task_scan = 0
                 if not once:
                     try:
                         baseline = observer.initialise_from_existing_runs()
@@ -94,6 +103,30 @@ class PhaseService:
                             'trading_ready':False}),flush=True)
                 while not self.stop.is_set():
                     now = time.time()
+                    # Reuse the existing service loop: no second scheduler or
+                    # trading gateway. An injected callback must be authenticated
+                    # and safe for research only; default production is inert.
+                    if self.model_task_cycle is not None and now-last_model_task_scan >= 25:
+                        try:
+                            counts = self.model_task_cycle()
+                            if not isinstance(counts, dict):
+                                raise TypeError('Model task cycle must return counts')
+                            allowed = ('completed', 'retry', 'failed')
+                            summary = {key: counts.get(key, 0) for key in allowed}
+                            if any(type(value) is not int or value < 0
+                                   for value in summary.values()):
+                                raise ValueError('Invalid model task cycle counters')
+                            print(json.dumps({
+                                'component': 'model_task_cycle',
+                                'counts': summary, 'broker_calls_by_phase_service': 0
+                            }), flush=True)
+                        except Exception as error:
+                            print(json.dumps({
+                                'component': 'model_task_cycle',
+                                'error_type': type(error).__name__,
+                                'trading_ready': False
+                            }), flush=True)
+                        last_model_task_scan = now
                     if not once and now-last_observer_scan >= 25:
                         try:
                             if not observer_available:
