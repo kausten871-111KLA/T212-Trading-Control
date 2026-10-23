@@ -39,7 +39,7 @@ class WorkerAdapterTests(unittest.TestCase):
     def test_pro_routing_when_configured(self):
         self.add("pro")
         result=run_existing_worker_cycle(self.queue,worker_id="existing-worker",
-          invoke_model=self.invoke,model_routes=ROUTES,now_utc=NOW)
+          invoke_model=self.invoke,model_routes=ROUTES,allow_pro=True,now_utc=NOW)
         self.assertEqual(result["completed"],1)
         self.assertEqual(self.calls[0]["model_id"],ROUTES["pro"])
 
@@ -48,6 +48,20 @@ class WorkerAdapterTests(unittest.TestCase):
         result=run_existing_worker_cycle(self.queue,worker_id="existing-worker",
           invoke_model=self.invoke,model_routes=ROUTES,allow_pro=False,now_utc=NOW)
         self.assertEqual(result["retry"],1)
+        self.assertEqual(self.calls,[])
+
+    def test_pro_denied_by_default_in_existing_worker(self):
+        self.add("pro")
+        result=run_existing_worker_cycle(self.queue,worker_id="existing-worker",
+          invoke_model=self.invoke,model_routes=ROUTES,now_utc=NOW)
+        self.assertEqual(result["retry"],1)
+        self.assertEqual(self.calls,[])
+
+    def test_pro_denied_by_default_in_direct_handler(self):
+        handler=DeepSeekTaskHandler(invoke_model=self.invoke,model_routes=ROUTES)
+        with self.assertRaises(PermissionError):
+            handler({"model_id":"trading-operations--deepseek","cost_tier":"pro",
+                     "job_kind":"analysis","instruction":"mock","task_id":"synthetic"})
         self.assertEqual(self.calls,[])
 
     def test_no_provider_model_guessing(self):
