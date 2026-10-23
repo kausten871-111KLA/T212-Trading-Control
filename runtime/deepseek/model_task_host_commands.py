@@ -19,6 +19,17 @@ def dispatch_model_task(payload, *, verified, db_path=DEFAULT_DB):
         raise PermissionError("Dedicated host token verification required")
     if not isinstance(payload, dict) or set(payload) != {"action", "payload"}:
         raise ValueError("Expected exactly action and payload")
+    action=payload["action"]
+    data=payload["payload"]
+    if not isinstance(data,dict) or action not in {"create","status","cancel"}:
+        raise ValueError("Invalid model task request")
+    if action=="create":
+        if (not {"job_kind","instruction","scheduled_at_utc","dedupe_key"} <= set(data)
+                or not set(data) <= ModelTaskIngress.CREATE_KEYS):
+            raise ValueError("Unexpected model task fields")
+    elif set(data) != ModelTaskIngress.CONTROL_KEYS:
+        raise ValueError("Explicit task ID required")
+    # Reject invalid/untrusted model fields before opening the task database.
     context = object()  # minted after dedicated server-side token verification
     verify = lambda principal, model_id: (
         principal is context and model_id == "trading-operations--deepseek"
