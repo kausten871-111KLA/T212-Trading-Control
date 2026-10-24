@@ -123,6 +123,40 @@ class ModelTaskQueueTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.queue.status(principal="not-authorized",task_id=tid)
 
+    def test_terminal_failure_counted_as_failed(self):
+        tid,_=self.add(max_attempts=1)
+        def handler(_):
+            raise RuntimeError("synthetic")
+        counts=run_due_once(self.queue,worker_id="w",model_handler=handler,now_utc=NOW)
+        self.assertEqual(counts,{"completed":0,"retry":0,"failed":1})
+        row=self.queue.status(principal="host-authenticated",task_id=tid)
+        self.assertEqual((row["state"],row["attempts"]),("failed",1))
+
+    def test_retriable_failure_counted_as_retry(self):
+        tid,_=self.add(max_attempts=2)
+        def handler(_):
+            raise RuntimeError("synthetic")
+        counts=run_due_once(self.queue,worker_id="w",model_handler=handler,now_utc=NOW)
+        self.assertEqual(counts,{"completed":0,"retry":1,"failed":0})
+        self.assertEqual(self.queue.status(principal="host-authenticated",task_id=tid)["state"],"pending")
+
+    def test_stale_cancelled_lease_not_counted_as_retry_or_failure(self):
+        tid,_=self.add(max_attempts=1)
+        def handler(_):
+            self.queue.cancel(principal="host-authenticated",task_id=tid)
+            raise RuntimeError("synthetic")
+        counts=run_due_once(self.queue,worker_id="w",model_handler=handler,now_utc=NOW)
+        self.assertEqual(counts,{"completed":0,"retry":0,"failed":0})
+        self.assertEqual(self.queue.status(principal="host-authenticated",task_id=tid)["state"],"cancelled")
+
+    def test_fail_optional_state_preserves_legacy_bool(self):
+        tid,_=self.add(max_attempts=1)
+        self.queue.claim(worker_id="w",now_utc=NOW)
+        self.assertEqual(self.queue.fail(task_id=tid,worker_id="w",error="synthetic",
+                                         now_utc=NOW,return_state=True),"failed")
+        self.assertFalse(self.queue.fail(task_id=tid,worker_id="w",error="stale",
+                                         now_utc=NOW))
+
 
 if __name__=="__main__":
     unittest.main()
