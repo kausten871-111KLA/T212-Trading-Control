@@ -105,13 +105,34 @@ class StateDB:
         return True
 
     @serialized
-    def requeue_dead(self):
-        self.conn.execute("BEGIN IMMEDIATE")
-        cur = self.conn.execute("UPDATE event_queue SET status=CASE WHEN attempts+1>=max_attempts "
-            "THEN 'failed' ELSE 'pending' END,attempts=attempts+1,worker_id=NULL,claim_token=NULL,"
-            "lease_expires_at=NULL WHERE status='claimed' AND lease_expires_at<=?",(time.time(),))
-        self.conn.commit()
-        return cur.rowcount
+    def requeue_dead(self, event_types):
+        """Reclaim only the event types owned by the calling worker role.
+
+        Global recovery can reset another worker's EXECUTE_ORDER lease. That
+        worker alone must reconcile potentially submitted broker intents.
+        """
+        if isinstance(event_types, (str, bytes)):
+            raise ValueError("Explicit non-empty event types required")
+        try:
+            event_types = tuple(event_types)
+        except TypeError as exc:
+            raise ValueError("Explicit non-empty event types required") from exc
+        if not event_types or any(not isinstance(t, str) or not t for t in event_types):
+            raise ValueError("Explicit non-empty event types required")
+        marks = ",".join("?" for _ in event_types)
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            cur = self.conn.execute(
+                "UPDATE event_queue SET status=CASE WHEN attempts+1>=max_attempts "
+                "THEN 'failed' ELSE 'pending' END,attempts=attempts+1,"
+                "worker_id=NULL,claim_token=NULL,lease_expires_at=NULL "
+                "WHERE status='claimed' AND lease_expires_at<=? AND event_type IN (" + marks + ")",
+                (time.time(), *event_types))
+            self.conn.commit()
+            return cur.rowcount
+        except Exception:
+            self.conn.rollback()
+            raise
 
     @serialized
     def prepare_intent(self, payload):
@@ -201,7 +222,7 @@ class Orchestrator:
     def worker_loop(self, worker_id, handler, event_types, poll=2.0, lease_ttl=60):
         while not self.stop_event.is_set():
             try:
-                self.db.requeue_dead()
+                self.db.requeue_dead(event_types)
                 for ev in self.db.claim(worker_id, event_types, lease_ttl=lease_ttl):
                     try:
                         result=handler(ev)

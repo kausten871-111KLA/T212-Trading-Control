@@ -61,4 +61,5 @@ class ExistingDemoGateway(GatewayAdapter):
         return self._mutation('cancel_order', intent_id, order_id=order_id)
     def reconcile(self, intent_id):
         result = self._mutation('reconcile_order_intent', intent_id)
-        return {'status': result.status, 'receipt': result.receipt, 'broker_order_id': result.broker_order_id}
+        return {'status': result.status, 'receipt': result.receipt, 'broker_order_id': result.broker_order_id,
+                'filled_qty': result.filled_qty, 'avg_price': result.avg_price}
