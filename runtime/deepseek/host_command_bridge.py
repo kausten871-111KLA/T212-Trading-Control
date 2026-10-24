@@ -148,7 +148,11 @@ class Handler(BaseHTTPRequestHandler):
             # Dedicated secret: the general bridge token must not authorize
             # model-created persistent work. Fail closed until provisioned.
             expected=os.environ.get("CONTABO_MODEL_TASK_TOKEN","")
-            supplied=self.headers.get("X-Model-Task-Token","")
+            supplied_headers=self.headers.get_all("X-Model-Task-Token",[])
+            # Ambiguous duplicate credentials must never select a first/last value.
+            if len(supplied_headers)!=1:
+                return self.respond(401,{"ok":False,"error":"not_authorized"})
+            supplied=supplied_headers[0]
             if len(expected)<48 or not expected.isascii():
                 return self.respond(503,{"ok":False,"error":"model_task_not_configured"})
             if not supplied or not supplied.isascii() or not hmac.compare_digest(supplied,expected):
@@ -159,7 +163,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(401,{"ok":False,"error":"not_authorized"})
         # Untrusted HTTP framing: reject malformed/oversized numeric headers
         # before conversion or body reads, without crashing the handler thread.
-        raw_length=self.headers.get("Content-Length")
+        lengths=self.headers.get_all("Content-Length",[])
+        # Reject duplicate lengths and Transfer-Encoding: a proxy or client
+        # must not be able to disagree with this HTTP/1.0 body parser.
+        if len(lengths)!=1 or self.headers.get_all("Transfer-Encoding",[]):
+            return self.respond(400,{"ok":False,"error":"invalid_length"})
+        raw_length=lengths[0]
         if (raw_length is None or len(raw_length)>8 or
                 not raw_length.isascii() or not raw_length.isdecimal()):
             return self.respond(400,{"ok":False,"error":"invalid_length"})
