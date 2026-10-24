@@ -177,8 +177,13 @@ class ModelTaskQueue:
             db.execute("ROLLBACK")
             raise
 
-    def fail(self, *, task_id, worker_id, error, now_utc=None, retry_seconds=60):
-        """Retry only within the recorded attempt budget."""
+    def fail(self, *, task_id, worker_id, error, now_utc=None, retry_seconds=60,
+             return_state=False):
+        """Retry only within the recorded attempt budget.
+
+        Default bool return preserves existing callers. Opt-in returns the
+        transactionally determined pending/failed state or None for a stale lease.
+        """
         if type(retry_seconds) is not int or not 1<=retry_seconds<=86400:
             raise ValueError("Invalid retry delay")
         now=utc(now_utc or datetime.now(timezone.utc))
@@ -191,15 +196,16 @@ class ModelTaskQueue:
                 (task_id,worker_id,now)).fetchone()
             if not row:
                 db.execute("COMMIT")
-                return False
+                return None if return_state else False
             retry=row["attempts"] < row["max_attempts"]
+            next_state="pending" if retry else "failed"
             db.execute(
                 "UPDATE model_background_task SET state=?, scheduled_at_utc=?,"
                 "error=?,lease_owner=NULL,lease_until_utc=NULL WHERE task_id=?",
-                ("pending" if retry else "failed", shift(now,retry_seconds) if retry else now,
+                (next_state, shift(now,retry_seconds) if retry else now,
                  str(error)[:350],task_id))
             db.execute("COMMIT")
-            return True
+            return next_state if return_state else True
         except Exception:
             db.execute("ROLLBACK")
             raise
@@ -234,7 +240,11 @@ def run_due_once(queue, *, worker_id, model_handler, now_utc=None):
                             now_utc=now_utc):
                 counts["completed"]+=1
         except Exception as exc:
-            if queue.fail(task_id=task["task_id"],worker_id=worker_id,error=type(exc).__name__,
-                          now_utc=now_utc):
+            outcome=queue.fail(task_id=task["task_id"],worker_id=worker_id,
+                               error=type(exc).__name__,now_utc=now_utc,
+                               return_state=True)
+            if outcome=="pending":
                 counts["retry"]+=1
+            elif outcome=="failed":
+                counts["failed"]+=1
     return counts
