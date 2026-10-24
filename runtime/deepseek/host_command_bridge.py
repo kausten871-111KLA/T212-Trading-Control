@@ -149,15 +149,21 @@ class Handler(BaseHTTPRequestHandler):
             # model-created persistent work. Fail closed until provisioned.
             expected=os.environ.get("CONTABO_MODEL_TASK_TOKEN","")
             supplied=self.headers.get("X-Model-Task-Token","")
-            if len(expected)<48:
+            if len(expected)<48 or not expected.isascii():
                 return self.respond(503,{"ok":False,"error":"model_task_not_configured"})
-            if not supplied or not hmac.compare_digest(supplied,expected):
+            if not supplied or not supplied.isascii() or not hmac.compare_digest(supplied,expected):
                 return self.respond(401,{"ok":False,"error":"not_authorized"})
         else:
             supplied=self.headers.get("X-Bridge-Token","")
             if not supplied or not hmac.compare_digest(supplied,TOKEN):
                 return self.respond(401,{"ok":False,"error":"not_authorized"})
-        length=int(self.headers.get("Content-Length","0") or 0)
+        # Untrusted HTTP framing: reject malformed/oversized numeric headers
+        # before conversion or body reads, without crashing the handler thread.
+        raw_length=self.headers.get("Content-Length")
+        if (raw_length is None or len(raw_length)>8 or
+                not raw_length.isascii() or not raw_length.isdecimal()):
+            return self.respond(400,{"ok":False,"error":"invalid_length"})
+        length=int(raw_length)
         if length < 2 or length > (16384 if model_task else 1024):
             return self.respond(413,{"ok":False,"error":"invalid_length"})
         try:
