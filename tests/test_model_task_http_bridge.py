@@ -83,6 +83,57 @@ class ModelTaskHTTPTests(unittest.TestCase):
                 finally:
                     conn.close()
 
+    def test_duplicate_content_length_rejected_before_dispatch(self):
+        with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
+            with patch("runtime.deepseek.model_task_host_commands.dispatch_model_task") as dispatch:
+                conn=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=3)
+                try:
+                    conn.putrequest("POST","/model-task")
+                    conn.putheader("X-Model-Task-Token",MODEL_SECRET)
+                    conn.putheader("Content-Length","2")
+                    conn.putheader("Content-Length","2")
+                    conn.endheaders(b"{}")
+                    resp=conn.getresponse()
+                    self.assertEqual(resp.status,400)
+                    self.assertEqual(json.loads(resp.read())["error"],"invalid_length")
+                    dispatch.assert_not_called()
+                finally:
+                    conn.close()
+
+    def test_transfer_encoding_and_length_rejected_before_dispatch(self):
+        with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
+            with patch("runtime.deepseek.model_task_host_commands.dispatch_model_task") as dispatch:
+                conn=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=3)
+                try:
+                    conn.putrequest("POST","/model-task")
+                    conn.putheader("X-Model-Task-Token",MODEL_SECRET)
+                    conn.putheader("Transfer-Encoding","chunked")
+                    conn.putheader("Content-Length","2")
+                    conn.endheaders(b"{}")
+                    resp=conn.getresponse()
+                    self.assertEqual(resp.status,400)
+                    self.assertEqual(json.loads(resp.read())["error"],"invalid_length")
+                    dispatch.assert_not_called()
+                finally:
+                    conn.close()
+
+    def test_duplicate_model_token_headers_rejected_before_dispatch(self):
+        with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
+            with patch("runtime.deepseek.model_task_host_commands.dispatch_model_task") as dispatch:
+                conn=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=3)
+                try:
+                    conn.putrequest("POST","/model-task")
+                    conn.putheader("X-Model-Task-Token",MODEL_SECRET)
+                    conn.putheader("X-Model-Task-Token",MODEL_SECRET)
+                    conn.putheader("Content-Length","2")
+                    conn.endheaders(b"{}")
+                    resp=conn.getresponse()
+                    self.assertEqual(resp.status,401)
+                    self.assertEqual(json.loads(resp.read())["error"],"not_authorized")
+                    dispatch.assert_not_called()
+                finally:
+                    conn.close()
+
     def test_nonascii_dedicated_token_fails_closed(self):
         with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
             code,data=self.send(token="é")
