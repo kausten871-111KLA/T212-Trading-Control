@@ -66,6 +66,29 @@ class ModelTaskHTTPTests(unittest.TestCase):
         self.assertEqual(dispatch.call_count,1)
         self.assertIs(dispatch.call_args.kwargs["verified"],True)
 
+    def test_malformed_content_length_fails_closed_without_dispatch(self):
+        with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
+            with patch("runtime.deepseek.model_task_host_commands.dispatch_model_task") as dispatch:
+                conn=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=3)
+                try:
+                    conn.putrequest("POST","/model-task")
+                    conn.putheader("X-Model-Task-Token",MODEL_SECRET)
+                    conn.putheader("Content-Length","not-a-number")
+                    conn.endheaders()
+                    resp=conn.getresponse()
+                    data=json.loads(resp.read())
+                    self.assertEqual(resp.status,400)
+                    self.assertEqual(data["error"],"invalid_length")
+                    dispatch.assert_not_called()
+                finally:
+                    conn.close()
+
+    def test_nonascii_dedicated_token_fails_closed(self):
+        with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
+            code,data=self.send(token="é")
+        self.assertEqual(code,401)
+        self.assertEqual(data["error"],"not_authorized")
+
     def test_unexpected_route_not_accepted(self):
         with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
             code,_=self.send(path="/model-task/run")
