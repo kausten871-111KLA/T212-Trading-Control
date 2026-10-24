@@ -81,6 +81,41 @@ class WebUIDstAPITests(unittest.TestCase):
         self.assertEqual(self.api.data["0"]["data"]["prompt"],"sensitive instructions unchanged")
         self.assertEqual(self.api.data["0"]["data"]["target"],{"type":"chat"})
 
+    def test_rollback_if_server_commits_then_post_times_out(self):
+        # A network timeout after persistence must not leave a partial
+        # five-job migration. The attempted ID is recorded before POST.
+        class TimeoutAfterCommitAPI(FakeAPI):
+            def update(self, aid, form):
+                result = super().update(aid, form)
+                if aid == "2" and not getattr(self, "timed_out", False):
+                    self.timed_out = True
+                    raise TimeoutError("response lost after server commit")
+                return result
+
+        api = TimeoutAfterCommitAPI(self.initial)
+        with self.assertRaisesRegex(RuntimeError, "rolled back"):
+            apply_five_job_plan(api, self.plan)
+        self.assertTrue(api.timed_out)
+        self.assertEqual([api.data[x["id"]] for x in self.initial], self.initial)
+
+    def test_rollback_if_persisted_next_run_has_wrong_timezone(self):
+        # A persisted RRULE alone is insufficient: the scheduler's UTC
+        # next_runs must include the NY-aligned Monday session instant.
+        class WrongNextRunAPI(FakeAPI):
+            def get(self, aid):
+                row = super().get(aid)
+                if aid == "0" and self.updates and (
+                    row["data"]["rrule"] == self.plan_first_rrule
+                ):
+                    row["next_runs"] = [0]
+                return row
+
+        api = WrongNextRunAPI(self.initial)
+        api.plan_first_rrule = self.plan[0]["proposed_rrule"]
+        with self.assertRaisesRegex(RuntimeError, "rolled back"):
+            apply_five_job_plan(api, self.plan)
+        self.assertEqual([api.data[x["id"]] for x in self.initial], self.initial)
+
     def test_incomplete_response_rejected(self):
         with self.assertRaises(ValueError):
             form_of({"name":"test"})
