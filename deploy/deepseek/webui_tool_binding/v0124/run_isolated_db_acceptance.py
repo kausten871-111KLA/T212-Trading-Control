@@ -6,19 +6,20 @@ or original backup. Does not launch WebUI or its automation scheduler, and both
 Docker tasks have --network none. The only SQLite migrations affect the copy.
 """
 from pathlib import Path
+import hashlib
 import os
 import secrets
+import shutil
+import sqlite3
 import subprocess
 import sys
-import textwrap
 
 IMAGE = "local/open-webui-toolbinding-v0124-stage:20261025"
 OLD_IMAGE = "local/open-webui-toolbinding-v0123-stage:20261020"
 OLD_ID = "sha256:7d8d04ead2b7c38d99b12b80a777b6030f3c694c491ca93e6bb010b5c3e82483"
 BASE = Path("/home/katie/webui-v0124-stage-20261025")
 BACKUP = Path("/home/katie/backups/webui-v0124-security-20261025")
-DATA = BASE / "data-test"
-COPIER = Path("/home/katie/webui-v0123-stage-20261020/stage_webui_data_links.py")
+DATA = BASE / "data-test-retry-1"  # Retain first failed test dir
 
 CHECK = r'''
 import asyncio, datetime, json, os, sqlite3, sys, types
@@ -107,6 +108,47 @@ def run(args, *, stdin=None, env=None):
 def out(args):
     return subprocess.check_output(args,text=True).strip()
 
+def digest(path):
+    h = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(2*1024*1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+def verify_snapshot(path):
+    # A completed sqlite3.Connection.backup() is already consistent.
+    # immutable=1 prevents read-only archived DB from trying to create -wal/-shm.
+    with sqlite3.connect(path.as_uri()+"?mode=ro&immutable=1", uri=True) as db:
+        assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok", "Archive SQLite integrity failure"
+        tables=db.execute("select count(*) from sqlite_master where type='table'").fetchone()[0]
+        assert tables>=48, f"Unexpected schema with {tables} tables"
+    return tables
+
+def copy_verified_snapshot():
+    source = BACKUP / "data"
+    source_db = source / "webui.db"
+    assert source_db.is_file(), "Oct 25 preserved backup missing"
+    tables = verify_snapshot(source_db)
+    root = source.resolve(strict=True)
+    # Preserve valid internal model-cache symlinks, never follow an escaping link.
+    for folder, directories, filenames in os.walk(source, followlinks=False):
+        here = Path(folder)
+        for name in directories:
+            assert not (here/name).is_symlink(), "Symlinked directory in archive"
+        for name in filenames:
+            item = here/name
+            if item.is_symlink():
+                assert not os.path.isabs(os.readlink(item)), "Absolute archive symlink"
+                target = item.resolve(strict=True)
+                assert target.is_relative_to(root) and target.is_file(), "Archive link escape"
+    assert not DATA.exists(), "Retry stage already exists; preserve it"
+    shutil.copytree(source, DATA, symlinks=True, copy_function=shutil.copy2)
+    target_db = DATA / "webui.db"
+    assert digest(source_db)==digest(target_db), "Snapshot copy SHA256 mismatch"
+    assert verify_snapshot(target_db)==tables, "Copy table count changed"
+    print("V0124_BACKUP_COPY_PASS", "tables", tables,
+          "database_bytes", target_db.stat().st_size, "original_preserved", True, flush=True)
+
 def main():
     assert out(["docker","inspect","-f","{{.Image}}","open-webui"])==OLD_ID, (
         "Running production image changed; no staging changes")
@@ -114,18 +156,10 @@ def main():
         "Live WebUI unhealthy; stop")
     assert (BACKUP/"data"/"webui.db").is_file(),"Oct 25 backup missing"
     assert (BACKUP/"docker-compose.yml").is_file(),"Oct 25 original Compose backup missing"
-    assert COPIER.is_file(),"Previously tested safe volume copier missing"
     assert BASE.is_dir(),"Oct 25 candidate source stage missing"
-    assert not DATA.exists(),"Previous data-test exists: inspect/finish it before rerun"
+    assert not DATA.exists(),"Retry stage already exists; inspect before rerunning"
     assert out(["docker","image","inspect","-f","{{.Id}}",IMAGE]),"Candidate image missing"
-    DATA.mkdir(mode=0o700)
-    # Never write to immutable backup or currently running named data volume.
-    run(["docker","run","--rm","--network","none",
-         "--security-opt","no-new-privileges","--cpus","2","--memory","2g",
-         "-v",f"{BACKUP/'data'}:/source:ro",
-         "-v",f"{DATA}:/dest",
-         "-v",f"{COPIER}:/copy.py:ro",
-         "--entrypoint","python",OLD_IMAGE,"/copy.py"])
+    copy_verified_snapshot()
     env=dict(os.environ)
     env["WEBUI_SECRET_KEY"]=secrets.token_hex(32) # disposable, never logged
     env["PYTHONDONTWRITEBYTECODE"]="1"
