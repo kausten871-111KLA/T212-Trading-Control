@@ -19,7 +19,7 @@ OLD_IMAGE = "local/open-webui-toolbinding-v0123-stage:20261020"
 OLD_ID = "sha256:7d8d04ead2b7c38d99b12b80a777b6030f3c694c491ca93e6bb010b5c3e82483"
 BASE = Path("/home/katie/webui-v0124-stage-20261025")
 BACKUP = Path("/home/katie/backups/webui-v0124-security-20261025")
-DATA = BASE / "data-test-retry-2"  # Retain both previous stage attempts
+DATA = BASE / "data-test-retry-3"  # Retain all previous stage attempts
 
 CHECK = r'''
 import asyncio, datetime, json, os, sqlite3, sys, types
@@ -163,7 +163,7 @@ def copy_verified_snapshot():
     assert not DATA.exists(), "Retry stage already exists; do not overwrite it"
     DATA.mkdir(mode=0o700)
     run(["docker","run","--rm","-i","--network","none",
-         "--security-opt","no-new-privileges","--cap-drop","ALL",
+         "--security-opt","no-new-privileges",
          "--cpus","2","--memory","2g",
          "-v",f"{BACKUP/'data'}:/source:ro",
          "-v",f"{DATA}:/dest",
