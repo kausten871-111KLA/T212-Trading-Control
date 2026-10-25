@@ -72,7 +72,7 @@ class ArchivedSqliteCopyTest(unittest.TestCase):
         self.link.unlink()
         outside = self.root / "outside.bin"
         outside.write_bytes(b"must not copy")
-        self.link.symlink_to("../../outside.bin")
+        self.link.symlink_to("../../../outside.bin")
         with self.assertRaisesRegex(AssertionError, "Archive link escape"):
             self.module.copy_verified_snapshot()
         self.assertFalse(self.stage.exists())
