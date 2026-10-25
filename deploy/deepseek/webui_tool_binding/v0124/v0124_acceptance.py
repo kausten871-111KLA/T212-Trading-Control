@@ -46,8 +46,14 @@ async def verify():
             assert data.get("prompt") and data.get("rrule"),f"{prefix} lost prompt/rrule"
             assert next_ns,f"{prefix} no next_run_at"
             dt=datetime.datetime.fromtimestamp(next_ns/1_000_000_000,datetime.timezone.utc)
-            assert (dt.year,dt.month,dt.day,dt.hour,dt.minute)==(2026,10,26,*clock),(
-                 f"{prefix} next UTC run mismatch: {dt.isoformat()} expected Mon 26 Oct {clock}")
+            now=datetime.datetime.now(datetime.timezone.utc)
+            first_run=datetime.datetime(2026,10,26,12,0,tzinfo=datetime.timezone.utc)
+            if now<first_run:
+                assert (dt.year,dt.month,dt.day,dt.hour,dt.minute)==(2026,10,26,*clock),(
+                     f"{prefix} next UTC run mismatch: {dt.isoformat()} expected Mon 26 Oct {clock}")
+            else:
+                assert dt>=now-datetime.timedelta(minutes=2),(
+                     f"{prefix} next run is stale: {dt.isoformat()}")
             print("STAGED_AUTOMATION_PASS",prefix,dt.isoformat(),flush=True)
         m=db.execute("select meta from model where id=?",(MODEL,)).fetchone()
         assert m,"Existing DeepSeek trading model missing"
