@@ -27,6 +27,10 @@ class RollbackStoppedWriterGate(unittest.TestCase):
         self.assertIn('webui_still_running', function)
         self.assertIn('V0124_ROLLBACK_BLOCKED invalid_snapshot_sqlite', function)
         self.assertIn('mode=ro&immutable=1', function)
+        self.assertIn('--network none --read-only', function)
+        # The private uid-1001 backup directory cannot be traversed if all
+        # capabilities are dropped from the root-owned archive helper.
+        self.assertNotIn('--cap-drop ALL', function)
         return function
 
     def simulate(self, *, stop_fails=False, still_running=False, missing_snapshot=False, unexpected_image=False, invalid_snapshot=False):
