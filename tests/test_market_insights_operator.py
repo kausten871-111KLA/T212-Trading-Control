@@ -82,6 +82,26 @@ class OperatorCandidateTests(unittest.TestCase):
                 "content": live.replace("prev_bar = snap", "prev_bar = {}")
             })
 
+    def test_sorted_webui_specs_verified(self):
+        previous = ["asset_universe", "bars", "candidate_scan", "health_check",
+                    "latest_quotes", "market_clock", "most_active",
+                    "scan_symbols", "snapshots", "top_movers"]
+        # WebUI inserts new methods alphabetically, not at the end.
+        ordered = sorted(previous + [operator.FUNCTION])
+        self.assertTrue(operator.specs_preserved(previous, ordered))
+        self.assertTrue(operator.specs_preserved(
+            previous, previous + [operator.FUNCTION]
+        ))
+        self.assertFalse(operator.specs_preserved(
+            previous, ordered + [operator.FUNCTION]
+        ))
+        self.assertFalse(operator.specs_preserved(
+            previous, ordered[:-1]
+        ))
+        self.assertFalse(operator.specs_preserved(
+            previous, sorted(previous[:-1] + [operator.FUNCTION, "unexpected"])
+        ))
+
     def test_no_candidate_rejected_without_touching_live_data(self):
         self.path.unlink()
         with self.assertRaisesRegex(RuntimeError, "candidate_source_not_staged"):
