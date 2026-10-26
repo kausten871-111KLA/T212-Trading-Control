@@ -181,6 +181,12 @@ def rollback():
 if __name__ == "__main__":
     os.umask(0o077)
     try:
+        if "--key-stdin" in sys.argv:
+            supplied = sys.stdin.readline().strip()
+            if not supplied.startswith("sk-") or len(supplied) < 25:
+                fail("invalid_operator_key_format")
+            os.environ["OPENWEBUI_ADMIN_API_KEY"] = supplied
+            sys.argv.remove("--key-stdin")
         action = sys.argv[1] if len(sys.argv) > 1 else "preflight"
         if action == "preflight":
             preflight()
