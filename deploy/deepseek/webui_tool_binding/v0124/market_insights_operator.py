@@ -140,6 +140,15 @@ def manifest():
         fail("upgrade_snapshot_missing")
     return json.loads(SNAPSHOT.read_text(encoding="utf-8"))
 
+def specs_preserved(previous, current):
+    """Preserve every original function and accept WebUI sorted function specs."""
+    return (
+        len(current) == len(previous) + 1
+        and len(current) == len(set(current))
+        and FUNCTION in current
+        and [name for name in current if name != FUNCTION] == previous
+    )
+
 def verify():
     saved = manifest()
     current_digest, ids = model_and_jobs()
@@ -149,7 +158,7 @@ def verify():
     if sha(tool["content"]) != saved["new_sha256"]:
         fail("new_tool_content_not_active")
     methods = [x.get("name") for x in tool.get("specs") or []]
-    if methods != saved["previous_specs"] + [FUNCTION]:
+    if not specs_preserved(saved["previous_specs"], methods):
         fail("new_function_not_resolved_by_webui")
     print("MARKET_INSIGHTS_VERIFY_PASS", FUNCTION, "five_tools", len(ids),
           "five_jobs", 5, "market_gateway_functions", len(methods), flush=True)
