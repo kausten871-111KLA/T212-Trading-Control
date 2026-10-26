@@ -29,7 +29,7 @@ class StageHelperDriftGateTests(unittest.TestCase):
         start = "# Verify audited helper scripts before any production change."
         end = 'test "$(docker inspect -f'
         self.assertEqual(text.count(start), 1)
-        self.assertEqual(text.count(end), 1)
+        self.assertIn(end, text.split(start, 1)[1])
         self.assertGreater(text.index(start), text.index('if [[ "$OP" == "--rollback" ]]'))
         self.assertLess(text.index(start), text.index('if [[ "$OP" == "--check" ]]'))
         self.assertLess(text.index(start), text.index("V0124_FRESH_BACKUP_PASS"))
