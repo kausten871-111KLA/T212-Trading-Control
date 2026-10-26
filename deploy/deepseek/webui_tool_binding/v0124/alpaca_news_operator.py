@@ -99,8 +99,8 @@ def new_content(tool):
     if ANCHOR in old:
         fail("function_already_installed")
     # A deliberate content-drift gate: preserve all previously installed code.
-    # Pin to the verified, installed first-stage source; never modify drifted code.
-    if sha(old) != "2f8d6e823ae6ca2b7f5d695bfa3a484034590514d7c21064a75864f135331a45":
+    # Pin to the verified, installed external-sources stage; never modify drifted code.
+    if sha(old) != "abb7831db9d82d5aa2c7c61e83d4bea7ec56d31da4756cef1885410db6656f76":
         fail("installed_market_gateway_has_changed_stop")
     if ast.dump(ast.parse(old), include_attributes=False) != ast.dump(
         ast.parse(before), include_attributes=False
