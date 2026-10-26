@@ -588,23 +588,36 @@ class Tools:
             if age < -30 or age > age_limit:
                 rejected["stale_or_future"] += 1
                 continue
+            # Provider payloads can contain non-finite numbers; never pass
+            # NaN/Infinity through to model-facing JSON or winner ranking.
             try:
                 change = float(row["changePctVsPrevClose"])
+                if not math.isfinite(change):
+                    change = None
             except (TypeError, ValueError, KeyError, OverflowError):
                 change = None
             try:
+                price = float(row["price"])
+                if not math.isfinite(price) or price <= 0:
+                    price = None
+            except (TypeError, ValueError, KeyError, OverflowError):
+                price = None
+            day_volume = None
+            previous_session_volume_ratio = None
+            try:
                 volume = float(row["dayVolume"])
                 previous = float(row["previousVolume"])
-                previous_session_volume_ratio = (
-                    round(volume / previous, 3) if previous > 0 else None
-                )
+                if math.isfinite(volume) and volume >= 0:
+                    day_volume = volume
+                    if math.isfinite(previous) and previous > 0:
+                        previous_session_volume_ratio = round(volume / previous, 3)
             except (TypeError, ValueError, KeyError, OverflowError, ZeroDivisionError):
-                previous_session_volume_ratio = None
+                pass
             rows.append({
                 "symbol": row.get("symbol"),
-                "price": row.get("price"),
+                "price": price,
                 "change_pct_vs_previous_close": change,
-                "day_volume": row.get("dayVolume"),
+                "day_volume": day_volume,
                 "previous_session_volume_ratio": previous_session_volume_ratio,
                 "volume_ratio_is_rvol": False,
                 "bid": row.get("bid"),
