@@ -11,6 +11,8 @@ kind = ("missing" if not value else "sk_api_key" if value.startswith("sk-")
 print("WEBUI_AUTH_KEY_TYPE", kind, flush=True)
 urls = [
     "/health",
+    "/api/v1/tools/",
+    "/api/v1/models/",
     "/api/v1/models/model?id=trading-operations--deepseek",
     "/api/v1/tools/id/market_data_gateway",
     "/api/v1/auths/",
