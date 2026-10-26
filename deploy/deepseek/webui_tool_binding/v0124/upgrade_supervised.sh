@@ -91,6 +91,14 @@ if [[ "$OP" == "--rollback" ]]; then
     echo "V0124_ALREADY_ORIGINAL no_restore_performed"
     exit 0
   fi
+  # Do not apply a stale v0.12.4 snapshot to an unrelated later upgrade.
+  # Only the original/candidate image pair is eligible for manual recovery.
+  if [[ "$running_id" != "$OLD_ID" && "$running_id" != "$NEW_ID" ]] ||
+     { ! grep -Fqx "    image: $OLD" "$COMPOSE" &&
+       ! grep -Fqx "    image: $NEW" "$COMPOSE"; }; then
+    echo "V0124_MANUAL_ROLLBACK_BLOCKED unexpected_image_or_compose"
+    exit 2
+  fi
   rollback "$2"
   exit 0
 fi
