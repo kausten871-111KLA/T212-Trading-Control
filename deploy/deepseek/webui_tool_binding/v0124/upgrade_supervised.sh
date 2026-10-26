@@ -67,6 +67,15 @@ on_error() {
 
 if [[ "$OP" == "--rollback" ]]; then
   [[ $# -eq 2 ]] || { echo "Usage: --rollback BACKUP_DIR"; exit 2; }
+  # A repeated/manual rollback must never restore a stale snapshot over an
+  # already-running original installation. Only a partial/new-image cutover
+  # is eligible for recovery. Automatic rollback uses rollback() directly.
+  running_id="$(docker inspect -f '{{.Image}}' open-webui)"
+  if [[ "$running_id" == "$OLD_ID" ]] &&
+     grep -Fqx "    image: $OLD" "$COMPOSE"; then
+    echo "V0124_ALREADY_ORIGINAL no_restore_performed"
+    exit 0
+  fi
   rollback "$2"
   exit 0
 fi
