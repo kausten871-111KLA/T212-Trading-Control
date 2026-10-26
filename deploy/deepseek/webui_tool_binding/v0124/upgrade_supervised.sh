@@ -61,10 +61,10 @@ try:
     db=sqlite3.connect("file:/source/webui.db?mode=ro&immutable=1",uri=True,timeout=10)
     try:
         ok=db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
-        count=db.execute("select count(*) from sqlite_master where type=?",("table",)).fetchone()[0]
+        names={row[0] for row in db.execute("select name from sqlite_master where type=?",("table",))}
     finally:
         db.close()
-    sys.exit(0 if ok and count>=48 else 1)
+    sys.exit(0 if ok and len(names)>=48 and {"automation","model","tool","user"}.issubset(names) else 1)
 except (sqlite3.Error, OSError):
     sys.exit(1)
 '; then
