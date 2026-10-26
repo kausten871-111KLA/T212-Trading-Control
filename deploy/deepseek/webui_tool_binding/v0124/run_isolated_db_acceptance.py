@@ -92,6 +92,7 @@ async def verify():
     resolved={item.get("tool_id") for item in got.values()}
     assert EXPECTED_TOOLS<=resolved,(
         "Tool schema unresolved: "+str(sorted(EXPECTED_TOOLS-resolved)))
+    assert len(got)>=30, f"Expected at least 30 resolved functions, found {len(got)}"
     receipt=assess_automation_tools(tool_ids,tool_ids,got)
     assert receipt.ready and not receipt.missing_ids,"Tool contract fails for scheduled automation"
     print("V0124_ISOLATED_DB_PASS","automations",len(jobs),
