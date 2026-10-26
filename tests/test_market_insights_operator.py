@@ -20,7 +20,7 @@ BASE = (
 ADDED = (
     "    async def market_insights_discovery(self):\n"
     "        result = await self.candidate_scan(top=20)\n"
-    "        return {'orders_submitted_by_tool': 0, 'data': result}\n"
+    "        return {\"orders_submitted_by_tool\": 0, \"data\": result}\n"
 )
 
 
@@ -52,7 +52,7 @@ class OperatorCandidateTests(unittest.TestCase):
 
     def test_unapproved_method_candidate_is_rejected(self):
         self.path.write_text(BASE + "\n" + ADDED.replace(
-            "'orders_submitted_by_tool': 0", "'something_else': 1"))
+            '"orders_submitted_by_tool": 0', '"something_else": 1'))
         with self.assertRaisesRegex(RuntimeError, "unreviewed_discovery_method"):
             operator.new_content({"content": BASE})
 
