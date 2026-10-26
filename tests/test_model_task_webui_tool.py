@@ -74,7 +74,8 @@ class ModelTaskWebUIToolTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_valid_create_uses_only_dedicated_token_and_fixed_endpoint(self):
         with patch.object(Path, "read_text", return_value=FAKE_TOKEN):
-            with patch.object(bridge_tool.httpx, "AsyncClient", FakeClient):
+            with patch.object(bridge_tool.httpx, "AsyncClient", FakeClient), \
+                 patch.object(bridge_tool.httpx, "AsyncHTTPTransport", side_effect=lambda **kw: kw):
                 result = json.loads(await self.tool.model_task(
                     "create", job_kind="research", instruction="Review market movers",
                     scheduled_at_utc="2026-10-26T14:00:00Z",
@@ -90,7 +91,7 @@ class ModelTaskWebUIToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("model_id", kwargs["json"]["payload"])
         self.assertNotIn("principal", kwargs["json"]["payload"])
         self.assertNotIn("broker", kwargs["json"]["payload"])
-        self.assertEqual(FakeClient.init_args["transport"]._uds,
+        self.assertEqual(FakeClient.init_args["transport"]["uds"],
                          "/run/contabo-bridge/command.sock")
 
     async def test_status_and_cancel_only_send_explicit_task_id(self):
