@@ -23,7 +23,9 @@ class RollbackSnapshotSqliteIntegrity(unittest.TestCase):
         compile(embedded, "<actual-rollback-sqlite-probe>", "exec")
         self.assertIn("mode=ro&immutable=1", embedded)
         self.assertIn("PRAGMA integrity_check", embedded)
-        self.assertIn("count>=48", embedded)
+        self.assertIn("len(names)>=48", embedded)
+        for name in ("automation", "model", "tool", "user"):
+            self.assertIn(name, embedded)
         return embedded
 
     def run_probe(self, embedded, db_path):
@@ -41,13 +43,21 @@ class RollbackSnapshotSqliteIntegrity(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             db_file = Path(temp) / "snapshot.db"
             with sqlite3.connect(db_file) as db:
-                for index in range(47):
+                for index in range(48):
                     db.execute(f"create table stage_{index} (id integer primary key)")
+                db.commit()
+            foreign_schema = self.run_probe(probe, db_file)
+            self.assertEqual(foreign_schema.returncode, 1, foreign_schema.stderr)
+            with sqlite3.connect(db_file) as db:
+                for index in range(4):
+                    db.execute(f"drop table stage_{index}")
+                for name in ("automation", "model", "tool"):
+                    db.execute(f"create table {name} (id integer primary key)")
                 db.commit()
             bad_count = self.run_probe(probe, db_file)
             self.assertEqual(bad_count.returncode, 1, bad_count.stderr)
             with sqlite3.connect(db_file) as db:
-                db.execute("create table stage_47 (id integer primary key)")
+                db.execute("create table user (id integer primary key)")
                 db.commit()
             good = self.run_probe(probe, db_file)
             self.assertEqual(good.returncode, 0, good.stderr)
