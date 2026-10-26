@@ -657,3 +657,164 @@ class Tools:
             "rejected": rejected,
             "candidates": rows,
         })
+
+
+    async def catalyst_news_search(
+        self, query: str, hours: int = 24, top: int = 15
+    ) -> str:
+        """
+        Query the documented GDELT DOC 2.0 news-index API for catalyst research.
+        This is NOT Yahoo/TradingView/Investing.com content; it returns article links
+        and metadata only, with no assertion of financial data rights or freshness.
+        One bounded request, no retry and no broker operations.
+        :param query: Company, ticker, sector or catalyst keyword, 2-120 characters.
+        :param hours: News discovery lookback, 1-72 hours.
+        :param top: Maximum articles returned, 1-25.
+        """
+        from datetime import datetime, timezone
+        import re
+
+        query = str(query or "").strip()
+        if not 2 <= len(query) <= 120 or not re.fullmatch(
+            r"[A-Za-z0-9\s.,+&()'/-]+", query
+        ):
+            return self._show({"ok": False, "source": "GDELT DOC 2.0",
+                               "error": "invalid_query", "orders_submitted": 0})
+        try:
+            hours = max(1, min(72, int(hours)))
+            top = max(1, min(25, int(top)))
+        except (ValueError, TypeError, OverflowError):
+            return self._show({"ok": False, "source": "GDELT DOC 2.0",
+                               "error": "invalid_parameters", "orders_submitted": 0})
+        params = {"query": query, "mode": "artlist", "format": "json",
+                  "maxrecords": top, "timespan": f"{hours}h"}
+        try:
+            async with httpx.AsyncClient(timeout=12.0, follow_redirects=False) as client:
+                response = await client.get(
+                    "https://api.gdeltproject.org/api/v2/doc/doc",
+                    params=params, headers={"Accept": "application/json"},
+                )
+            if response.status_code == 429:
+                return self._show({"ok": False, "source": "GDELT DOC 2.0",
+                                   "error": "provider_rate_limited_429",
+                                   "orders_submitted": 0})
+            if response.status_code != 200:
+                return self._show({"ok": False, "source": "GDELT DOC 2.0",
+                                   "error": "provider_http_" + str(response.status_code),
+                                   "orders_submitted": 0})
+            payload = response.json()
+            articles = payload.get("articles", []) if isinstance(payload, dict) else []
+            rows = [
+                {
+                    "title": str(row.get("title", ""))[:240],
+                    "url": str(row.get("url", ""))[:600],
+                    "source_domain": str(row.get("domain", ""))[:120],
+                    "source_country": str(row.get("sourcecountry", ""))[:40],
+                    "seendate": str(row.get("seendate", ""))[:40],
+                    "language": str(row.get("language", ""))[:25],
+                    "unverified_news_catalyst": True,
+                }
+                for row in articles[:top]
+                if isinstance(row, dict)
+                and str(row.get("url", "")).startswith(("https://", "http://"))
+            ]
+            return self._show({
+                "ok": True, "provider": "GDELT DOC 2.0",
+                "read_only": True, "orders_submitted": 0,
+                "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
+                "lookback_hours": hours, "query": query, "article_count": len(rows),
+                "articles": rows,
+                "note": "News-index leads only. Verify original reporting, ticker, "
+                        "publication time and market impact before any trade decision.",
+            })
+        except (httpx.RequestError, ValueError, TypeError) as exc:
+            return self._show({
+                "ok": False, "source": "GDELT DOC 2.0",
+                "error": "provider_unavailable_or_invalid_response",
+                "error_type": type(exc).__name__, "orders_submitted": 0,
+            })
+
+    async def barchart_licensed_quotes(self, symbols_csv: str) -> str:
+        """
+        Quote lookup using Barchart OnDemand ONLY if an already-owned entitlement
+        explicitly authorises automated/algorithmic use. Never buys a subscription.
+        :param symbols_csv: Up to 10 US share symbols, comma-separated.
+        """
+        import re
+        symbols = [
+            symbol for symbol in self._symbols(symbols_csv, max_symbols=10)
+            if re.fullmatch(r"[A-Z0-9.^-]{1,15}", symbol)
+        ]
+        if not symbols:
+            return self._show({"ok": False, "source": "Barchart OnDemand",
+                               "error": "no_valid_symbols", "orders_submitted": 0})
+        if os.getenv("BARCHART_ALGO_USE_APPROVED", "").strip() != "1":
+            return self._show({"ok": False, "source": "Barchart OnDemand",
+                               "error": "algorithmic_use_entitlement_not_confirmed",
+                               "orders_submitted": 0, "provider_calls": 0})
+        key = os.getenv("BARCHART_API_KEY", "").strip()
+        if not key:
+            return self._show({"ok": False, "source": "Barchart OnDemand",
+                               "error": "api_key_not_configured",
+                               "orders_submitted": 0, "provider_calls": 0})
+        try:
+            # Provider documents POST form-data to keep key out of URL parameters.
+            async with httpx.AsyncClient(timeout=12.0, follow_redirects=False) as client:
+                response = await client.post(
+                    "https://ondemand.websol.barchart.com/getQuote.json",
+                    data={"apikey": key, "symbols": ",".join(symbols)},
+                    headers={"Accept": "application/json"},
+                )
+            if response.status_code != 200:
+                return self._show({"ok": False, "source": "Barchart OnDemand",
+                                   "error": "provider_http_" + str(response.status_code),
+                                   "orders_submitted": 0})
+            data = response.json()
+            if not isinstance(data, dict) or data.get("status", {}).get("code") != 200:
+                return self._show({"ok": False, "source": "Barchart OnDemand",
+                                   "error": "provider_status_not_success",
+                                   "orders_submitted": 0})
+            fields = ("symbol", "name", "mode", "lastPrice", "tradeTimestamp",
+                      "preMarketPrice", "preMarketTimestamp", "percentChange",
+                      "volume", "previousVolume", "serverTimestamp")
+            quotes = [
+                {field: row.get(field) for field in fields}
+                for row in data.get("results", [])[:10] if isinstance(row, dict)
+            ]
+            return self._show({"ok": True, "source": "Barchart OnDemand",
+                               "read_only": True, "orders_submitted": 0,
+                               "quotes": quotes,
+                               "broker_tradability_verified": False,
+                               "note": "Quote mode R/I/D depends on licence. "
+                                       "Verify venue, timestamps and T212 prices."})
+        except (httpx.RequestError, ValueError, TypeError) as exc:
+            return self._show({"ok": False, "source": "Barchart OnDemand",
+                               "error": "provider_unavailable_or_invalid_response",
+                               "error_type": type(exc).__name__, "orders_submitted": 0})
+
+    async def external_source_status(self) -> str:
+        """Report integration status without contacting paid or restricted services."""
+        return self._show({
+            "read_only": True, "orders_submitted": 0, "provider_calls": 0,
+            "sources": {
+                "Alpaca": "installed_existing_market_gateway",
+                "Twelve Data": "installed_separate_existing_tool",
+                "GDELT": "news_adapter_installed; availability_probed_per_request",
+                "Barchart": (
+                    "licensed_adapter_ready"
+                    if os.getenv("BARCHART_ALGO_USE_APPROVED", "") == "1"
+                    and bool(os.getenv("BARCHART_API_KEY", "").strip())
+                    else "awaiting_algorithmic_use_entitlement_and_key"
+                ),
+                "TradingView": "non_display_automated_use_not_authorised",
+                "StockAnalysis": "no_programmatic_API",
+                "Yahoo Finance": "permissioned_API_or_export_required",
+                "Finviz": "licensed_export_or_permission_required",
+                "Investing.com": "no_public_API",
+                "Trading 212 Social": "authorised_export_or_permission_required",
+                "Trading 212 Community": "automated_monitoring_restricted",
+                "Trading 212 Pie Library": "public_library_API_not_in_broker_gateway",
+                "Stocktwits": "new_API_registrations_closed",
+                "Reddit": "OAuth_and_app_approval_required",
+            },
+        })
