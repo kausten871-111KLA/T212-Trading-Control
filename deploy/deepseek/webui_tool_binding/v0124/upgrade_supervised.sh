@@ -40,19 +40,29 @@ rollback() {
   test -f "$RESTORE" && test -f "$COMPOSE"
   test "$(docker image inspect -f '{{.Id}}' "$OLD")" = "$OLD_ID"
   grep -Fqx "    image: $OLD" "$directory/docker-compose.yml"
-  docker compose -f "$COMPOSE" stop open-webui
-  cp -p "$directory/docker-compose.yml" "$COMPOSE"
+  # IMPORTANT: rollback() is invoked under `||` from on_error(), so Bash
+  # ignores errexit inside the function. Guard every destructive step
+  # explicitly. NEVER restore SQLite if the live writer could still run.
+  if ! docker compose -f "$COMPOSE" stop open-webui; then
+    echo "V0124_ROLLBACK_BLOCKED could_not_stop_webui"
+    return 1
+  fi
+  if [[ "$(docker inspect -f '{{.State.Running}}' open-webui)" != "false" ]]; then
+    echo "V0124_ROLLBACK_BLOCKED webui_still_running"
+    return 1
+  fi
+  cp -p "$directory/docker-compose.yml" "$COMPOSE" || return 1
   docker run --rm --network none --security-opt no-new-privileges \
     --cpus 2 --memory 2g \
     -v "$directory/data:/source:ro" \
     -v "$DATA_VOL:/target" \
     -v "$RESTORE:/restore.py:ro" \
-    "$NEW" python /restore.py
-  docker compose -f "$COMPOSE" up -d --no-deps --force-recreate --pull never open-webui
-  ready
-  test "$(docker inspect -f '{{.Image}}' open-webui)" = "$OLD_ID"
-  systemctl --user is-active --quiet deepseek-phase.service
-  systemctl --user is-active --quiet deepseek-command-bridge.service
+    "$NEW" python /restore.py || return 1
+  docker compose -f "$COMPOSE" up -d --no-deps --force-recreate --pull never open-webui || return 1
+  ready || return 1
+  test "$(docker inspect -f '{{.Image}}' open-webui)" = "$OLD_ID" || return 1
+  systemctl --user is-active --quiet deepseek-phase.service || return 1
+  systemctl --user is-active --quiet deepseek-command-bridge.service || return 1
   echo "V0124_ROLLBACK_PASS original_image_and_preupgrade_sqlite_restored"
 }
 on_error() {
