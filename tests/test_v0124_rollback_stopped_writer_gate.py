@@ -25,9 +25,11 @@ class RollbackStoppedWriterGate(unittest.TestCase):
         self.assertIn('if ! docker compose -f "$COMPOSE" stop open-webui; then', function)
         self.assertIn('docker inspect -f', function)
         self.assertIn('webui_still_running', function)
+        self.assertIn('V0124_ROLLBACK_BLOCKED invalid_snapshot_sqlite', function)
+        self.assertIn('mode=ro&immutable=1', function)
         return function
 
-    def simulate(self, *, stop_fails=False, still_running=False, missing_snapshot=False, unexpected_image=False):
+    def simulate(self, *, stop_fails=False, still_running=False, missing_snapshot=False, unexpected_image=False, invalid_snapshot=False):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             backup = root / "webui-v0124-cutover-fixture"
@@ -60,7 +62,10 @@ class RollbackStoppedWriterGate(unittest.TestCase):
                 "    printf '%s\\n' \"$MOCK_RUNNING\"; return 0; fi\n"
                 "  if [[ \"$1\" == inspect && \"$3\" == '{{.Image}}' ]]; then\n"
                 "    printf '%s\\n' \"$OLD_ID\"; return 0; fi\n"
-                "  if [[ \"$1\" == run ]]; then echo MOCK_RESTORE_SQLITE; return 0; fi\n"
+                "  if [[ \"$1\" == run ]]; then\n"
+                "    if [[ \" $* \" == *\" -c \"* ]]; then\n"
+                "      echo MOCK_VERIFY_SNAPSHOT; [[ \"$MOCK_DB_INVALID\" == 0 ]]; return $?; fi\n"
+                "    echo MOCK_RESTORE_SQLITE; return 0; fi\n"
                 "  if [[ \"$1\" == compose && \"$4\" == up ]]; then echo MOCK_RESTART; return 0; fi\n"
                 "  echo UNEXPECTED_DOCKER_ARGS \"$@\"; return 90\n"
                 "}\n"
@@ -75,7 +80,8 @@ class RollbackStoppedWriterGate(unittest.TestCase):
                 env={"PATH": "/usr/bin:/bin",
                      "MOCK_STOP_FAIL": "1" if stop_fails else "0",
                      "MOCK_RUNNING": "true" if still_running else "false",
-                     "MOCK_IMAGE_ID": "sha256:wrong" if unexpected_image else OLD_ID},
+                     "MOCK_IMAGE_ID": "sha256:wrong" if unexpected_image else OLD_ID,
+                     "MOCK_DB_INVALID": "1" if invalid_snapshot else "0"},
                 timeout=10,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -111,8 +117,17 @@ class RollbackStoppedWriterGate(unittest.TestCase):
         self.assertNotIn("MOCK_STOP_ATTEMPT", output)
         self.assertNotIn("MOCK_RESTORE_SQLITE", output)
 
+    def test_corrupt_sqlite_blocks_before_stop_and_restore(self):
+        output, unchanged = self.simulate(invalid_snapshot=True)
+        self.assertTrue(unchanged)
+        self.assertIn("MOCK_VERIFY_SNAPSHOT", output)
+        self.assertIn("V0124_ROLLBACK_BLOCKED invalid_snapshot_sqlite", output)
+        self.assertNotIn("MOCK_STOP_ATTEMPT", output)
+        self.assertNotIn("MOCK_RESTORE_SQLITE", output)
+
     def test_confirmed_stopped_writer_allows_restore_and_restart(self):
         output, _ = self.simulate(stop_fails=False, still_running=False)
+        self.assertLess(output.index("MOCK_VERIFY_SNAPSHOT"), output.index("MOCK_STOP_ATTEMPT"))
         self.assertIn("MOCK_RESTORE_SQLITE", output)
         self.assertIn("MOCK_RESTART", output)
         self.assertIn("V0124_ROLLBACK_PASS", output)
