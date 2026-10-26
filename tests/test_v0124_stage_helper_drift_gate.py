@@ -31,7 +31,7 @@ class StageHelperDriftGateTests(unittest.TestCase):
         self.assertEqual(text.count(start), 1)
         self.assertIn(end, text.split(start, 1)[1])
         self.assertGreater(text.index(start), text.index('if [[ "$OP" == "--rollback" ]]'))
-        self.assertLess(text.index(start), text.index('if [[ "$OP" == "--check" ]]'))
+        self.assertGreater(text.index(start), text.index('[[ "$OP" == "--check" || "$OP" == "--deploy" ]]'))
         self.assertLess(text.index(start), text.index("V0124_FRESH_BACKUP_PASS"))
         return text.split(start, 1)[1].split(end, 1)[0]
 
