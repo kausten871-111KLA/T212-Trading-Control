@@ -45,6 +45,30 @@ rollback() {
       echo "V0124_ROLLBACK_BLOCKED invalid_backup_or_image"
       return 1
     }
+  # Validate the archived SQLite BEFORE stopping the live writer. The
+  # snapshot is root-owned (0600); an isolated no-network Docker helper can
+  # inspect it without changing ownership, opening WAL, or touching production.
+  # A missing/corrupt/foreign-schema backup must not cause avoidable downtime.
+  if ! docker run --rm --network none --read-only --cap-drop ALL \
+    --security-opt no-new-privileges --memory 512m \
+    -e PYTHONDONTWRITEBYTECODE=1 \
+    -v "$directory/data:/source:ro" \
+    --entrypoint python "$OLD" -c '
+import sqlite3,sys
+try:
+    db=sqlite3.connect("file:/source/webui.db?mode=ro&immutable=1",uri=True,timeout=10)
+    try:
+        ok=db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+        count=db.execute("select count(*) from sqlite_master where type=\x27table\x27").fetchone()[0]
+    finally:
+        db.close()
+    sys.exit(0 if ok and count>=48 else 1)
+except (sqlite3.Error, OSError):
+    sys.exit(1)
+'; then
+    echo "V0124_ROLLBACK_BLOCKED invalid_snapshot_sqlite"
+    return 1
+  fi
   # IMPORTANT: rollback() is invoked under `||` from on_error(), so Bash
   # ignores errexit inside the function. Guard every destructive step
   # explicitly. NEVER restore SQLite if the live writer could still run.
