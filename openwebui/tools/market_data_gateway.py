@@ -818,3 +818,91 @@ class Tools:
                 "Reddit": "OAuth_and_app_approval_required",
             },
         })
+
+
+    async def alpaca_news_catalysts(
+        self, symbols_csv: str = "", lookback_hours: int = 24, top: int = 15
+    ) -> str:
+        """
+        Retrieve timestamped market-news leads via the already authorised
+        Alpaca Market Data News API. No third-party website scraping and no
+        broker trading actions. Actual timeliness depends on account entitlement.
+        :param symbols_csv: Optional comma-separated equity symbols, maximum 10.
+        :param lookback_hours: Inclusive lookback, 1-72 hours.
+        :param top: Maximum headlines, 1-25. One bounded request, no pagination.
+        """
+        from datetime import datetime, timedelta, timezone
+        import re
+        try:
+            lookback_hours = max(1, min(72, int(lookback_hours)))
+            top = max(1, min(25, int(top)))
+        except (ValueError, TypeError, OverflowError):
+            return self._show({
+                "ok": False, "source": "Alpaca News API",
+                "error": "invalid_parameters", "orders_submitted": 0,
+            })
+        symbols = self._symbols(symbols_csv, max_symbols=10)
+        if any(not re.fullmatch(r"[A-Z0-9.^-]{1,15}", symbol) for symbol in symbols):
+            return self._show({
+                "ok": False, "source": "Alpaca News API",
+                "error": "invalid_symbols", "orders_submitted": 0,
+            })
+        now = datetime.now(timezone.utc)
+        start = (now - timedelta(hours=lookback_hours)).isoformat().replace("+00:00", "Z")
+        params = {
+            "start": start, "limit": top, "sort": "desc",
+            "include_content": "false",
+        }
+        if symbols:
+            params["symbols"] = ",".join(symbols)
+        payload, error = await self._get(self.data_base, "/v1beta1/news", params=params)
+        if error:
+            return self._show({
+                "ok": False, "source": "Alpaca News API",
+                "error": "provider_error", "error_detail": str(error)[:240],
+                "orders_submitted": 0,
+            })
+        if not isinstance(payload, dict) or not isinstance(payload.get("news"), list):
+            return self._show({
+                "ok": False, "source": "Alpaca News API",
+                "error": "unexpected_provider_response", "orders_submitted": 0,
+            })
+        items = []
+        for row in payload["news"][:top]:
+            if not isinstance(row, dict):
+                continue
+            created = str(row.get("created_at") or "")
+            age = None
+            if created:
+                try:
+                    t = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                    if t.tzinfo and t.utcoffset() is not None:
+                        age = round((now - t.astimezone(timezone.utc)).total_seconds())
+                except (ValueError, OverflowError):
+                    pass
+            items.append({
+                "headline": str(row.get("headline") or "")[:260],
+                "summary": str(row.get("summary") or "")[:500],
+                "url": str(row.get("url") or "")[:800],
+                "publisher": str(row.get("source") or "")[:100],
+                "symbols": row.get("symbols") if isinstance(row.get("symbols"), list) else [],
+                "published_at_utc": created,
+                "updated_at_utc": str(row.get("updated_at") or ""),
+                "age_seconds": age,
+                "unverified_catalyst_lead": True,
+                "broker_tradability_verified": False,
+            })
+        return self._show({
+            "ok": True, "provider": "Alpaca",
+            "source": "alpaca_news_api",
+            "read_only_market_research": True,
+            "orders_submitted": 0,
+            "retrieved_at_utc": now.isoformat(),
+            "lookback_hours": lookback_hours,
+            "news_entitlement_delay_unverified": True,
+            "filter_symbols": symbols,
+            "count": len(items),
+            "articles": items,
+            "note": "News catalyst leads, not confirmed trading signals. "
+                    "Check publication age, original reporting, momentum and T212 instrument.",
+        })
