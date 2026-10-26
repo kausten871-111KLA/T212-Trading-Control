@@ -16,6 +16,20 @@ SOURCES = [
 
 def tool_count_guard(path):
     tree = ast.parse(path.read_text(), filename=str(path))
+    if path.name == "run_isolated_db_acceptance.py":
+        # The staging acceptance program is deliberately embedded as a
+        # CHECK string, executed inside the isolated v0.12.4 container.
+        checks = [
+            node.value.value for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "CHECK"
+                    for target in node.targets)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ]
+        if len(checks) != 1:
+            raise AssertionError("Expected exactly one embedded CHECK program")
+        tree = ast.parse(checks[0], filename=str(path)+":CHECK")
     guards = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Assert) and ast.unparse(node.test) == "len(got) >= 30":
