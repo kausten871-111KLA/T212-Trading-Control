@@ -77,5 +77,28 @@ class MarketInsightsDiscoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["rejected"]["stale_or_future"], 1)
 
 
+    async def test_nonfinite_provider_metrics_are_not_ranked_or_emitted(self):
+        self.tool.candidate_scan.return_value = self.response([
+            {"symbol": "BAD", "price": float("nan"),
+             "changePctVsPrevClose": float("inf"),
+             "dayVolume": float("inf"), "previousVolume": 100,
+             "quoteTimestamp": iso(10)},
+            {"symbol": "GOOD", "price": 3.25,
+             "changePctVsPrevClose": 8.5,
+             "dayVolume": 200, "previousVolume": 100,
+             "quoteTimestamp": iso(10)},
+        ])
+        raw = await self.tool.market_insights_discovery()
+        # Strict JSON decoders must accept the model-facing response.
+        result = json.loads(raw, parse_constant=lambda x: self.fail("nonfinite JSON: " + x))
+        self.assertEqual([x["symbol"] for x in result["candidates"]], ["GOOD", "BAD"])
+        bad = result["candidates"][1]
+        self.assertIsNone(bad["price"])
+        self.assertIsNone(bad["change_pct_vs_previous_close"])
+        self.assertIsNone(bad["day_volume"])
+        self.assertIsNone(bad["previous_session_volume_ratio"])
+        self.assertEqual(result["orders_submitted_by_tool"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
