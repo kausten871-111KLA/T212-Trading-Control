@@ -56,6 +56,32 @@ class OperatorCandidateTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "unreviewed_discovery_method"):
             operator.new_content({"content": BASE})
 
+    def test_approved_previous_volume_rebase_only(self):
+        live = (
+            "import json\n"
+            "class Tools:\n"
+            "    def _snapshot_summary(self, snap):\n"
+            "        prev_bar = snap\n"
+            "        prev_close = prev_bar.get('c')\n"
+            "        return {\n"
+            '            "previousClose": prev_close,\n'
+            "        }\n"
+            "    async def candidate_scan(self, top=20, feed='iex'):\n"
+            "        return '[]'\n"
+        )
+        old_key = '            "previousClose": prev_close,\n'
+        added_key = '            "previousVolume": prev_bar.get("v"),\n'
+        reviewed = live.replace(old_key, old_key + added_key)
+        self.path.write_text(reviewed + "\n" + ADDED)
+        rebased = operator.new_content({"content": live})
+        self.assertIn(added_key, rebased)
+        self.assertTrue(rebased.startswith(reviewed.rstrip()))
+        compile(rebased, "<approved_rebase>", "exec")
+        with self.assertRaisesRegex(RuntimeError, "existing_tool_differs"):
+            operator.new_content({
+                "content": live.replace("prev_bar = snap", "prev_bar = {}")
+            })
+
     def test_no_candidate_rejected_without_touching_live_data(self):
         self.path.unlink()
         with self.assertRaisesRegex(RuntimeError, "candidate_source_not_staged"):
