@@ -132,6 +132,15 @@ fi
   echo "Usage: --check | --deploy | --rollback BACKUP_DIR"; exit 2;
 }
 test -f "$COMPOSE" && test -f "$COPIER" && test -f "$RESTORE" && test -f "$ACCEPT"
+# Verify audited helper scripts before any production change. A stale acceptance
+# script can otherwise make an apparently successful cutover unsafe even when
+# --check passes. Keep this gate in BOTH --check and --deploy, after --rollback.
+# These are pinned Git blob IDs of the exact reviewed helper source files.
+if [[ "$(git hash-object "$ACCEPT")" != "c77bc38f2c53ccbdb3ff84178533f81fb4f9d58b" ]] ||
+   [[ "$(git hash-object "$RESTORE")" != "14140f8a7ee2ac1dc3e54120e469199bb2cd41f4" ]]; then
+  echo "V0124_STAGE_HELPER_DRIFT_BLOCKED acceptance_or_restore_blob_mismatch"
+  exit 2
+fi
 test "$(docker inspect -f '{{.Image}}' open-webui)" = "$OLD_ID"
 test "$(docker image inspect -f '{{.Id}}' "$OLD")" = "$OLD_ID"
 test "$(docker image inspect -f '{{.Id}}' "$NEW")" = "$NEW_ID"
