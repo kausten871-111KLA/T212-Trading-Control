@@ -33,13 +33,18 @@ rollback() {
   local directory="$1"
   echo "V0124_ROLLBACK_START $directory"
   [[ "$directory" == /home/katie/backups/webui-v0124-cutover-* ]] || return 1
-  test -d "$directory" && test ! -L "$directory"
-  test -d "$directory/data" && test ! -L "$directory/data"
-  test -f "$directory/data/webui.db" && test ! -L "$directory/data/webui.db"
-  test -f "$directory/docker-compose.yml" && test ! -L "$directory/docker-compose.yml"
-  test -f "$RESTORE" && test -f "$COMPOSE"
-  test "$(docker image inspect -f '{{.Id}}' "$OLD")" = "$OLD_ID"
-  grep -Fqx "    image: $OLD" "$directory/docker-compose.yml"
+  # on_error invokes rollback() under ||, disabling errexit in Bash.
+  # Reject incomplete/untrusted snapshots BEFORE stopping the live writer.
+  { test -d "$directory" && test ! -L "$directory" &&
+    test -d "$directory/data" && test ! -L "$directory/data" &&
+    test -f "$directory/data/webui.db" && test ! -L "$directory/data/webui.db" &&
+    test -f "$directory/docker-compose.yml" && test ! -L "$directory/docker-compose.yml" &&
+    test -f "$RESTORE" && test -f "$COMPOSE" &&
+    test "$(docker image inspect -f '{{.Id}}' "$OLD")" = "$OLD_ID" &&
+    grep -Fqx "    image: $OLD" "$directory/docker-compose.yml"; } || {
+      echo "V0124_ROLLBACK_BLOCKED invalid_backup_or_image"
+      return 1
+    }
   # IMPORTANT: rollback() is invoked under `||` from on_error(), so Bash
   # ignores errexit inside the function. Guard every destructive step
   # explicitly. NEVER restore SQLite if the live writer could still run.
