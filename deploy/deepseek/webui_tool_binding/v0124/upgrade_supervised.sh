@@ -46,10 +46,12 @@ rollback() {
       return 1
     }
   # Validate the archived SQLite BEFORE stopping the live writer. The
-  # snapshot is root-owned (0600); an isolated no-network Docker helper can
-  # inspect it without changing ownership, opening WAL, or touching production.
+  # snapshot is root-owned (0600) under a uid-1001 private (0700) directory.
+  # Retain Docker's default root DAC traversal capability for this read-only
+  # bind mount; --cap-drop ALL makes the original snapshot inaccessible.
+  # No network, host writes, secret mounts or production data volume access.
   # A missing/corrupt/foreign-schema backup must not cause avoidable downtime.
-  if ! docker run --rm --network none --read-only --cap-drop ALL \
+  if ! docker run --rm --network none --read-only \
     --security-opt no-new-privileges --memory 512m \
     -e PYTHONDONTWRITEBYTECODE=1 \
     -v "$directory/data:/source:ro" \
