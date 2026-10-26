@@ -531,3 +531,116 @@ class Tools:
                 ),
             }
         )
+
+    async def market_insights_discovery(
+        self, top: int = 20, feed: str = "iex", max_age_seconds: int = 300
+    ) -> str:
+        """Discover current US gainers and activity from the existing Alpaca entitlement.
+
+        Provides an evidence-labelled alternative to manually viewed TradingView,
+        StockAnalysis and Yahoo Finance pages. It does NOT scrape those sites,
+        access broker orders or claim consolidated quotes from IEX.
+        :param top: Number of screener seeds (5-30).
+        :param feed: Existing Alpaca IEX or delayed SIP feed entitlement.
+        :param max_age_seconds: Maximum observed quote/trade age (30-1800 seconds).
+        """
+        from datetime import datetime, timezone
+
+        feed = str(feed or "").strip().lower()
+        if feed not in {"iex", "delayed_sip"}:
+            return self._show({"ok": False, "error": "unsupported_feed"})
+        try:
+            top = max(5, min(int(top), 30))
+            age_limit = max(30, min(int(max_age_seconds), 1800))
+        except (TypeError, ValueError, OverflowError):
+            return self._show({"ok": False, "error": "invalid_parameters"})
+
+        try:
+            raw = await self.candidate_scan(top=top, feed=feed)
+            scan = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return self._show({"ok": False, "error": "candidate_scan_invalid_response"})
+        if not isinstance(scan, dict) or not isinstance(scan.get("candidates"), list):
+            return self._show({"ok": False, "error": "candidate_scan_unavailable"})
+
+        now = datetime.now(timezone.utc)
+        rows = []
+        rejected = {"missing_or_invalid_timestamp": 0, "stale_or_future": 0}
+        for row in scan["candidates"]:
+            if not isinstance(row, dict):
+                continue
+            observations = []
+            for key in ("quoteTimestamp", "tradeTimestamp"):
+                value = row.get(key)
+                if not isinstance(value, str) or not value.strip():
+                    continue
+                try:
+                    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                    if parsed.tzinfo is not None and parsed.utcoffset() is not None:
+                        observations.append(parsed.astimezone(timezone.utc))
+                except (ValueError, OverflowError):
+                    continue
+            if not observations:
+                rejected["missing_or_invalid_timestamp"] += 1
+                continue
+            latest = max(observations)
+            age = (now - latest).total_seconds()
+            if age < -30 or age > age_limit:
+                rejected["stale_or_future"] += 1
+                continue
+            try:
+                change = float(row["changePctVsPrevClose"])
+            except (TypeError, ValueError, KeyError, OverflowError):
+                change = None
+            try:
+                volume = float(row["dayVolume"])
+                previous = float(row["previousVolume"])
+                previous_session_volume_ratio = (
+                    round(volume / previous, 3) if previous > 0 else None
+                )
+            except (TypeError, ValueError, KeyError, OverflowError, ZeroDivisionError):
+                previous_session_volume_ratio = None
+            rows.append({
+                "symbol": row.get("symbol"),
+                "price": row.get("price"),
+                "change_pct_vs_previous_close": change,
+                "day_volume": row.get("dayVolume"),
+                "previous_session_volume_ratio": previous_session_volume_ratio,
+                "volume_ratio_is_rvol": False,
+                "bid": row.get("bid"),
+                "ask": row.get("ask"),
+                "spread_pct": row.get("spreadPct"),
+                "quote_venue": feed,
+                "observation_at_utc": latest.isoformat(),
+                "observation_age_seconds": round(max(0.0, age), 3),
+                "source": "alpaca:candidate_scan",
+                "broker_tradability_verified": False,
+            })
+        rows.sort(
+            key=lambda item: (
+                item["change_pct_vs_previous_close"] is not None,
+                item["change_pct_vs_previous_close"]
+                if item["change_pct_vs_previous_close"] is not None else -999999.0,
+            ),
+            reverse=True,
+        )
+        return self._show({
+            "ok": bool(rows),
+            "provider": "Alpaca",
+            "source": "alpaca:candidate_scan",
+            "feed": feed,
+            "observed_at_utc": now.isoformat(),
+            "market": "US equities",
+            "read_only_market_research": True,
+            "orders_submitted_by_tool": 0,
+            "entitlement": "requires_existing_provider_permission",
+            "not_tradingview_stockanalysis_or_yahoo_data": True,
+            "screener_may_include_previous_session_seeds": True,
+            "requires_broker_quote_and_instrument_verification": True,
+            "movers_error": scan.get("moversError"),
+            "most_active_error": scan.get("mostActiveError"),
+            "snapshot_error": scan.get("snapshotError"),
+            "candidate_count": len(rows),
+            "rejected": rejected,
+            "candidates": rows,
+        })
