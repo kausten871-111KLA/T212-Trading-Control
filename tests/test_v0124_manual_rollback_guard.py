@@ -24,7 +24,7 @@ class ManualRollbackIdempotence(unittest.TestCase):
         self.assertEqual(content.count(END), 1)
         return START + content.split(START,1)[1].split(END,1)[0]
 
-    def simulate(self, image_id, compose_image):
+    def simulate(self, image_id, compose_image, *, expected_exit=0):
         with tempfile.TemporaryDirectory() as temp:
             compose = Path(temp) / "docker-compose.yml"
             compose.write_text("services:\n  open-webui:\n    image: "+compose_image+"\n")
@@ -35,6 +35,8 @@ class ManualRollbackIdempotence(unittest.TestCase):
                 'set -- --rollback /nonexistent/mock-backup\n'
                 'OLD='+OLD+'\n'
                 'OLD_ID='+OLD_ID+'\n'
+                'NEW='+NEW+'\n'
+                'NEW_ID='+NEW_ID+'\n'
                 'COMPOSE='+str(compose)+'\n'
                 'docker() { printf "%s\\n" "$MOCK_IMAGE_ID"; }\n'
                 'rollback() { echo "MOCK_ROLLBACK_INVOKED"; }\n'
@@ -44,7 +46,7 @@ class ManualRollbackIdempotence(unittest.TestCase):
                 ["bash","-c",harness],capture_output=True,text=True,
                 env={"PATH":"/usr/bin:/bin","MOCK_IMAGE_ID":image_id},
                 timeout=10)
-            self.assertEqual(completed.returncode,0,completed.stderr)
+            self.assertEqual(completed.returncode,expected_exit,completed.stderr)
             self.assertEqual(compose.read_bytes(),initial)
             return completed.stdout
 
@@ -58,6 +60,19 @@ class ManualRollbackIdempotence(unittest.TestCase):
 
     def test_partial_compose_switch_calls_restore(self):
         self.assertIn("MOCK_ROLLBACK_INVOKED",self.simulate(OLD_ID,NEW))
+
+    def test_partial_image_switch_calls_restore(self):
+        self.assertIn("MOCK_ROLLBACK_INVOKED",self.simulate(NEW_ID,OLD))
+
+    def test_unrelated_future_image_blocks_restore(self):
+        output=self.simulate("sha256:unrelated-upgrade",NEW,expected_exit=2)
+        self.assertIn("V0124_MANUAL_ROLLBACK_BLOCKED",output)
+        self.assertNotIn("MOCK_ROLLBACK_INVOKED",output)
+
+    def test_unrelated_future_compose_blocks_restore(self):
+        output=self.simulate(NEW_ID,"local/other-webui:v0.12.5",expected_exit=2)
+        self.assertIn("V0124_MANUAL_ROLLBACK_BLOCKED",output)
+        self.assertNotIn("MOCK_ROLLBACK_INVOKED",output)
 
 if __name__ == "__main__":
     unittest.main()
