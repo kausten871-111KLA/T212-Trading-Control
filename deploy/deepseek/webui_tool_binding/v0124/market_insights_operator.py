@@ -4,6 +4,7 @@
 Run inside the existing WebUI container. Uses authenticated WebUI REST API,
 not direct SQLite writes. Never invokes providers, brokers, models or crawlers.
 """
+import ast
 import hashlib
 import json
 import os
@@ -98,9 +99,20 @@ def new_content(tool):
         fail("function_already_installed")
     # A deliberate content-drift gate: preserve all previously installed code.
     if old.strip() != before.strip():
-        print("SOURCE_DIFFERENCE", "live_sha256", sha(old),
-              "reviewed_prefix_sha256", sha(before.strip()), flush=True)
-        fail("existing_tool_differs_from_candidate_base_stop")
+        # Approved one-field rebase for the v0.12.4 live gateway.
+        # Fail closed unless adding previousVolume exactly reproduces
+        # the AST of the already reviewed candidate base.
+        original_key = '            "previousClose": prev_close,\n'
+        volume_key = '            "previousVolume": prev_bar.get("v"),\n'
+        if old.count(original_key) != 1 or volume_key in old:
+            fail("existing_tool_differs_from_candidate_base_stop")
+        rebased = old.replace(original_key, original_key + volume_key, 1)
+        if ast.dump(ast.parse(rebased), include_attributes=False) != ast.dump(
+            ast.parse(before), include_attributes=False
+        ):
+            fail("existing_tool_differs_from_candidate_base_stop")
+        old = rebased
+        print("SOURCE_REBASE_PASS", "reviewed_previous_volume_only", flush=True)
     addition = ANCHOR + method
     if "await self.candidate_scan(" not in addition or '"orders_submitted_by_tool": 0' not in addition:
         fail("unreviewed_discovery_method")
