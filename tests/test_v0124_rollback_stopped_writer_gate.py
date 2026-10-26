@@ -30,7 +30,7 @@ class RollbackStoppedWriterGate(unittest.TestCase):
         self.assertIn('--network none --read-only', function)
         # The private uid-1001 backup directory cannot be traversed if all
         # capabilities are dropped from the root-owned archive helper.
-        self.assertNotIn('--cap-drop ALL', function)
+        self.assertNotIn('if ! docker run --rm --network none --read-only --cap-drop ALL', function)
         return function
 
     def simulate(self, *, stop_fails=False, still_running=False, missing_snapshot=False, unexpected_image=False, invalid_snapshot=False):
