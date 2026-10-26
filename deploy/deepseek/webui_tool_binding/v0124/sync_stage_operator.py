@@ -20,7 +20,7 @@ import tempfile
 
 REPO = Path("/home/katie/t212-brain-benchmark-stage-20261020")
 STAGE = Path("/home/katie/webui-v0124-stage-20261025")
-COMMIT = "575a3f7a350933c2d14a2b0cac755e4224d703af"
+COMMIT = "1cdebe5afe0089cebff83c91bd0867618c541a2c"
 REL = "deploy/deepseek/webui_tool_binding/v0124/"
 # These are actual 04:58 GMT 26 Oct staged Git blob hashes, read over
 # authorised strict-host-key SSH. The third file already matches the PR.
@@ -30,7 +30,7 @@ BEFORE = {
     "v0124_restore_db.py": "14140f8a7ee2ac1dc3e54120e469199bb2cd41f4",
 }
 TARGET = {
-    "upgrade_supervised.sh": "6d100ca641f08ef3894b4d604aa3979215a55161",
+    "upgrade_supervised.sh": "7ca10e921473a584a56eccb3073bd8e76e23a520",
     "v0124_acceptance.py": "c77bc38f2c53ccbdb3ff84178533f81fb4f9d58b",
     "v0124_restore_db.py": "14140f8a7ee2ac1dc3e54120e469199bb2cd41f4",
 }
