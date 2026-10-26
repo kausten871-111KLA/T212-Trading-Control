@@ -59,7 +59,7 @@ try:
     db=sqlite3.connect("file:/source/webui.db?mode=ro&immutable=1",uri=True,timeout=10)
     try:
         ok=db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
-        count=db.execute("select count(*) from sqlite_master where type=\x27table\x27").fetchone()[0]
+        count=db.execute("select count(*) from sqlite_master where type=?",("table",)).fetchone()[0]
     finally:
         db.close()
     sys.exit(0 if ok and count>=48 else 1)
