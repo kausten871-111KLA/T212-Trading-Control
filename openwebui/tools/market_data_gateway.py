@@ -317,17 +317,53 @@ class Tools:
 
     async def top_movers(self, top: int = 20) -> str:
         """
-        Return current top US stock gainers and losers from Alpaca's screener endpoint.
-        Read-only. Some Alpaca plans may restrict this endpoint; exact 403/plan errors are returned.
+        Return Alpaca's regular-session US mover list, with explicit session
+        provenance. The provider's mover rankings reset at market OPEN, not
+        premarket; before the open they are PREVIOUS regular-session winners.
+        Market clock status does NOT prove individual quote freshness.
+        Read-only; no trade eligibility, ranking or risk rules are imposed.
         :param top: Number of gainers and losers requested, 1-50.
         """
+        from datetime import datetime, timezone
+
         top = max(1, min(int(top), 50))
         data, error = await self._get(
             self.data_base,
             "/v1beta1/screener/stocks/movers",
             params={"top": top},
         )
-        return error or self._show(data)
+        if error:
+            return error
+        if not isinstance(data, dict):
+            return self._show(data)
+        clock, clock_error = await self._get(self.trading_base, "/v2/clock")
+        is_open = clock.get("is_open") if isinstance(clock, dict) else None
+        if not isinstance(is_open, bool) or clock_error:
+            session = "unknown_clock_unverified"
+        elif is_open:
+            session = "current_regular_session_unverified_quote_age"
+        else:
+            session = "last_regular_session_not_live_premarket"
+        # Add metadata WITHOUT changing the provider's original gainers,
+        # losers, symbols, amounts, relative ordering, or any broker path.
+        enriched = dict(data)
+        enriched.update({
+            "source": "alpaca:/v1beta1/screener/stocks/movers",
+            "provider_list_type": "regular_session_movers",
+            "mover_list_session": session,
+            "not_a_live_premarket_gainers_list": True,
+            "market_clock_is_open": is_open if isinstance(is_open, bool) else None,
+            "market_clock_error": clock_error,
+            "market_clock_timestamp": (
+                clock.get("timestamp") if isinstance(clock, dict) else None
+            ),
+            "received_at_utc": datetime.now(timezone.utc).isoformat(),
+            "individual_quote_or_trade_timestamps_verified": False,
+            "coverage": "Alpaca supplied screener set, not full-market live top 50",
+            "read_only_market_research": True,
+            "orders_submitted_by_tool": 0,
+        })
+        return self._show(enriched)
 
     async def most_active(self, top: int = 30, by: str = "volume") -> str:
         """
