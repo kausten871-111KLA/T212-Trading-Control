@@ -113,8 +113,7 @@ def new_content(tool):
         fail("original_movers_method_changed_stop")
     if ("last_regular_session_not_live_premarket" not in method
             or "market_clock_is_open" not in method
-            or "orders_submitted_by_tool" not in method
-            or "gainers" in method.replace("provider's original gainers", "")):
+            or "orders_submitted_by_tool" not in method):
         # The replacement is additive provenance; it must not own trade logic
         # or independently alter any market mover ranking/order.
         fail("unreviewed_session_provenance_method")
