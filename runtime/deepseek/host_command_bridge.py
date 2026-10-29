@@ -119,6 +119,16 @@ def execute(command, symbol="IBM", exchange="", mic_code="", interval="1day",
         except ValueError:return {"ok":False,"error":"invalid_acceptance_output"}
     return {"ok":False,"error":"unsupported"}
 
+def _unique_json_object(pairs):
+    """Reject ambiguous duplicate keys at every JSON nesting level."""
+    obj = {}
+    for key, value in pairs:
+        if key in obj:
+            raise ValueError("Duplicate JSON field")
+        obj[key] = value
+    return obj
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "ContaboBridge/1.0"
     def log_message(self, fmt, *args):
@@ -176,7 +186,7 @@ class Handler(BaseHTTPRequestHandler):
         if length < 2 or length > (16384 if model_task else 1024):
             return self.respond(413,{"ok":False,"error":"invalid_length"})
         try:
-            payload=json.loads(self.rfile.read(length))
+            payload=json.loads(self.rfile.read(length), object_pairs_hook=_unique_json_object)
             if not isinstance(payload,dict):raise ValueError
         except (ValueError,UnicodeDecodeError):
             return self.respond(400,{"ok":False,"error":"invalid_json"})
