@@ -134,6 +134,33 @@ class ModelTaskHTTPTests(unittest.TestCase):
                 finally:
                     conn.close()
 
+    def test_duplicate_json_keys_rejected_before_dispatch(self):
+        """Both top-level and nested ambiguous JSON fields must fail closed."""
+        bodies = (
+            b'{"action":"status","action":"cancel","payload":{"task_id":"x"}}',
+            b'{"action":"status","payload":{"task_id":"x","task_id":"y"}}',
+        )
+        with patch.dict(os.environ, {"CONTABO_MODEL_TASK_TOKEN": MODEL_SECRET}):
+            with patch("runtime.deepseek.model_task_host_commands.dispatch_model_task") as dispatch:
+                for body in bodies:
+                    with self.subTest(body=body):
+                        conn = http.client.HTTPConnection(
+                            "127.0.0.1", self.server.server_port, timeout=3)
+                        try:
+                            conn.request(
+                                "POST", "/model-task", body=body,
+                                headers={
+                                    "X-Model-Task-Token": MODEL_SECRET,
+                                    "Content-Type": "application/json",
+                                })
+                            resp = conn.getresponse()
+                            self.assertEqual(resp.status, 400)
+                            self.assertEqual(
+                                json.loads(resp.read())["error"], "invalid_json")
+                        finally:
+                            conn.close()
+                dispatch.assert_not_called()
+
     def test_nonascii_dedicated_token_fails_closed(self):
         with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
             code,data=self.send(token="é")
