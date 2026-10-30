@@ -119,6 +119,11 @@ def execute(command, symbol="IBM", exchange="", mic_code="", interval="1day",
         except ValueError:return {"ok":False,"error":"invalid_acceptance_output"}
     return {"ok":False,"error":"unsupported"}
 
+def _reject_nonfinite_constant(value):
+    """Reject Python JSON extensions (NaN/Infinity) before task dispatch."""
+    raise ValueError("Non-finite JSON constant")
+
+
 def _unique_json_object(pairs):
     """Reject ambiguous duplicate keys at every JSON nesting level."""
     obj = {}
@@ -186,7 +191,8 @@ class Handler(BaseHTTPRequestHandler):
         if length < 2 or length > (16384 if model_task else 1024):
             return self.respond(413,{"ok":False,"error":"invalid_length"})
         try:
-            payload=json.loads(self.rfile.read(length), object_pairs_hook=_unique_json_object)
+            payload=json.loads(self.rfile.read(length), object_pairs_hook=_unique_json_object,
+                               parse_constant=_reject_nonfinite_constant)
             if not isinstance(payload,dict):raise ValueError
         except (ValueError,UnicodeDecodeError):
             return self.respond(400,{"ok":False,"error":"invalid_json"})
