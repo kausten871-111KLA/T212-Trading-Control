@@ -194,6 +194,14 @@ class Handler(BaseHTTPRequestHandler):
             payload=json.loads(self.rfile.read(length), object_pairs_hook=_unique_json_object,
                                parse_constant=_reject_nonfinite_constant)
             if not isinstance(payload,dict):raise ValueError
+            if model_task:
+                # The model-task contract has a flat payload of scalar fields.
+                # Nested arrays/objects are never valid and can be expensive
+                # to decode or validate; reject before opening the queue.
+                fields = payload.get("payload")
+                if (not isinstance(fields, dict) or
+                        any(isinstance(value, (dict, list)) for value in fields.values())):
+                    raise ValueError("Nested model-task fields are not supported")
         except (ValueError, UnicodeDecodeError, RecursionError):
             # Deeply nested but small JSON can exceed the decoder recursion
             # limit; reject it as invalid input without dropping the socket.
