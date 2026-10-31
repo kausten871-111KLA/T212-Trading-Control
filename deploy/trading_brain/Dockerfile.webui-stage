@@ -1,0 +1,13 @@
+# Isolated candidate ONLY; this does not register a WebUI tool or alter production.
+FROM local/open-webui-toolbinding-v0123-stage:20261020
+LABEL org.opencontainers.image.title="Open WebUI 0.12.3 Trading Brain staged research tool"
+LABEL org.opencontainers.image.description="Research context only; no broker execution; stage for supervised review"
+COPY components/quote_economics.py /app/backend/trading_brain_components/quote_economics.py
+COPY components/momentum_features.py /app/backend/trading_brain_components/momentum_features.py
+COPY components/finmem_research.py /app/backend/trading_brain_components/finmem_research.py
+COPY components/evidence_review.py /app/backend/trading_brain_components/evidence_review.py
+COPY components/research_context.py /app/backend/trading_brain_components/research_context.py
+COPY components/market_gateway_normalizer.py /app/backend/trading_brain_components/market_gateway_normalizer.py
+COPY components/trading_brain_research_tool.py /app/backend/trading_brain_components/trading_brain_research_tool.py
+ENV PYTHONPATH="/app/backend/trading_brain_components:/app/backend"
+RUN python -c "from trading_brain_research_tool import Tools; from research_context import compile_context; print('TRADING_BRAIN_STAGED_IMAGE_IMPORT_PASS')"

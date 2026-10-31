@@ -1,0 +1,40 @@
+--- a/open_webui/utils/middleware.py
++++ b/open_webui/utils/middleware.py
+@@ -3183,0 +3184,37 @@
++        # The model must receive the functions configured for this automation.
++        # Inspect actual server-resolved callable names; never trust model prose
++        # as a statement of tool availability. No tool is invoked here.
++        if metadata.get('automation_id'):
++            from open_webui.models.models import Models
++            from open_webui.utils.automation_tool_contract import (
++                assess_automation_tools,
++                capability_manifest,
++            )
++            stored_model = await Models.get_model_by_id(
++                metadata.get('model_id') or form_data.get('model')
++            )
++            stored_meta = (
++                stored_model.meta.model_dump(exclude_none=True)
++                if stored_model and stored_model.meta else {}
++            )
++            expected_ids = stored_meta.get('toolIds') or []
++            if expected_ids:
++                capability = assess_automation_tools(
++                    expected_ids, tool_ids, tools_dict
++                )
++                if capability.missing_ids:
++                    log.error(
++                        'Scheduled automation %s missing configured tool bindings: %s',
++                        metadata.get('automation_id'),
++                        capability.missing_ids,
++                    )
++                    raise RuntimeError(
++                        'Scheduled automation tool resolution failure: '
++                        + ', '.join(capability.missing_ids)
++                    )
++                manifest = capability_manifest(capability)
++                if manifest:
++                    form_data['messages'] = add_or_update_system_message(
++                        manifest, form_data['messages'], append=True
++                    )
++

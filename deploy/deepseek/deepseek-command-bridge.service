@@ -1,0 +1,20 @@
+[Unit]
+Description=DeepSeek authenticated Contabo fixed-command bridge
+After=default.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/t212-runtime-service
+EnvironmentFile=%h/.config/deepseek-runtime/bridge.env
+ExecStart=/usr/bin/python3 -m runtime.deepseek.host_command_bridge
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

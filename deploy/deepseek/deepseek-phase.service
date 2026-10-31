@@ -1,0 +1,19 @@
+[Unit]
+Description=DeepSeek durable phase dispatcher (controller outbox only)
+After=default.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/t212-runtime-service
+ExecStart=/usr/bin/python3 -m runtime.deepseek.service --db %h/.local/state/deepseek-runtime/trading_state.db
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
