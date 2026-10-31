@@ -189,6 +189,32 @@ class ModelTaskHTTPTests(unittest.TestCase):
                             conn.close()
                 dispatch.assert_not_called()
 
+    def test_deeply_nested_json_returns_400_and_bridge_survives(self):
+        """Bounded-size nesting must not crash the HTTP handler thread."""
+        body = (b'{"action":"status","payload":{"task_id":'
+                + b'[' * 1200 + b'0' + b']' * 1200 + b'}}')
+        self.assertLess(len(body), 16384)
+        with patch.dict(os.environ, {"CONTABO_MODEL_TASK_TOKEN": MODEL_SECRET}):
+            with patch("runtime.deepseek.model_task_host_commands.dispatch_model_task",
+                       return_value={"ok": True, "state": "pending"}) as dispatch:
+                conn = http.client.HTTPConnection(
+                    "127.0.0.1", self.server.server_port, timeout=3)
+                try:
+                    conn.request(
+                        "POST", "/model-task", body=body,
+                        headers={"X-Model-Task-Token": MODEL_SECRET,
+                                 "Content-Type": "application/json"})
+                    resp = conn.getresponse()
+                    self.assertEqual(resp.status, 400)
+                    self.assertEqual(json.loads(resp.read())["error"], "invalid_json")
+                finally:
+                    conn.close()
+                dispatch.assert_not_called()
+                code, data = self.send()
+                self.assertEqual(code, 200)
+                self.assertTrue(data["ok"])
+                dispatch.assert_called_once()
+
     def test_nonascii_dedicated_token_fails_closed(self):
         with patch.dict(os.environ,{"CONTABO_MODEL_TASK_TOKEN":MODEL_SECRET}):
             code,data=self.send(token="é")
