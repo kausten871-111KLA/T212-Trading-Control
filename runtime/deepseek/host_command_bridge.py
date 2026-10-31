@@ -194,7 +194,9 @@ class Handler(BaseHTTPRequestHandler):
             payload=json.loads(self.rfile.read(length), object_pairs_hook=_unique_json_object,
                                parse_constant=_reject_nonfinite_constant)
             if not isinstance(payload,dict):raise ValueError
-        except (ValueError,UnicodeDecodeError):
+        except (ValueError, UnicodeDecodeError, RecursionError):
+            # Deeply nested but small JSON can exceed the decoder recursion
+            # limit; reject it as invalid input without dropping the socket.
             return self.respond(400,{"ok":False,"error":"invalid_json"})
         try:
             if model_task:
