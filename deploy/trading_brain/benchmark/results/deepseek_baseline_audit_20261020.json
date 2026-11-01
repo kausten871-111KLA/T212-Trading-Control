@@ -1,0 +1,50 @@
+{
+  "source": "DeepSeek baseline from user-uploaded response; exact original preserved",
+  "dataset_id": "alpaca_eod_2026-10-20_20_symbol_user_supplied",
+  "evidence_sha256": "cbf27160ec376c2355729d1f1eeb05e6a30082128eff2c46b99fa617f32c49d1",
+  "original_decisions": 20,
+  "actions": {
+    "WAIT": 6,
+    "RESEARCH": 14
+  },
+  "unsupported_ticker_references": [
+    {
+      "ticker": "IREN",
+      "unsupported_references": [
+        "CIFR"
+      ]
+    },
+    {
+      "ticker": "BITO",
+      "unsupported_references": [
+        "BTC"
+      ]
+    },
+    {
+      "ticker": "SOXL",
+      "unsupported_references": [
+        "SOXX"
+      ]
+    },
+    {
+      "ticker": "SOXS",
+      "unsupported_references": [
+        "SOXX"
+      ]
+    },
+    {
+      "ticker": "MSTZ",
+      "unsupported_references": [
+        "MSTR"
+      ]
+    }
+  ],
+  "unsupported_reference_occurrences": 5,
+  "normalization_scope": "Only invalid evidence_tickers removed and missing_evidence annotated. No action, thesis, bull or bear text changed.",
+  "verification_limitations": [
+    "No independent vendor raw response or quote timestamp for these snapshot rows",
+    "Unverified takeover/IPO/catalyst descriptions are hypotheses, not checked news",
+    "Some narrative claims rely on previous memory or facts outside frozen evidence",
+    "No P&L or trade-execution outcome established by this EOD comparison"
+  ]
+}

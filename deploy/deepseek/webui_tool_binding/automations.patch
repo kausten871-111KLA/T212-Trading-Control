@@ -1,0 +1,24 @@
+--- a/open_webui/utils/automations.py
++++ b/open_webui/utils/automations.py
+@@ -169 +169,20 @@
+-    meta = model.get('info', {}).get('meta', {})
++    meta = ((model.get('info') or {}).get('meta') or {})
++    # Refresh only missing cache metadata from the authoritative workspace model.
++    # A deliberate empty cached toolIds list remains authoritative: flag stale
++    # configuration instead of silently adding execution capability.
++    from open_webui.models.models import Models
++    persisted = await Models.get_model_by_id(model_id)
++    persisted_meta = (
++        persisted.meta.model_dump(exclude_none=True)
++        if persisted and persisted.meta else {}
++    )
++    persisted_tool_ids = set(persisted_meta.get('toolIds') or [])
++    cached_tool_ids = set(meta.get('toolIds') or [])
++    if persisted_tool_ids and 'toolIds' not in meta:
++        log.warning('Automation model registry missing configured tool IDs for %s; resolving from persisted model', model_id)
++        meta = {**meta, 'toolIds': sorted(persisted_tool_ids)}
++    elif persisted_tool_ids - cached_tool_ids:
++        raise RuntimeError(
++            'Automation model tool metadata differs from saved configuration; '
++            'refresh model registry before running'
++        )

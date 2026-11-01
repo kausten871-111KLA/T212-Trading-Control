@@ -1,0 +1,294 @@
+{
+  "dataset_id": "alpaca_eod_2026-10-20_20_symbol_user_supplied",
+  "evidence_sha256": "cbf27160ec376c2355729d1f1eeb05e6a30082128eff2c46b99fa617f32c49d1",
+  "assessed_at_utc": null,
+  "decisions": [
+    {
+      "ticker": "BRZE",
+      "action": "WAIT",
+      "thesis": "Takeover gap pinned near all-cash deal terms; remaining upside is merger-arb spread, not momentum. Clean 0.13% spread but no gap-and-go edge — this is a late-chase merger arb, not a momentum entry.",
+      "bull_case": "Higher or competing bidder emerges and re-rates price above current terms; pre-close drift into deal.",
+      "bear_case": "Deal breaks or terms are cut → gap back toward pre-announcement; residual upside ≈ thin arb spread already mostly captured.",
+      "missing_evidence": [
+        "deal price and premium vs pre-announcement",
+        "expected close date and break fee",
+        "financing/regulatory risk",
+        "second-bidder probability"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "MYGN",
+      "action": "WAIT",
+      "thesis": "News-driven catalyst gap (+31.4%) but 28.7% bid/ask spread makes fill economics prohibitive; not executable without a clean consolidated quote. Data-quality problem, not a price-level exclusion.",
+      "bull_case": "Catalyst continues to re-rate at next open and spread compresses to tradeable levels.",
+      "bear_case": "Spread persists → immediate slippage exceeds edge; gap fade and profit-taking.",
+      "missing_evidence": [
+        "consolidated live quote (bid 4.77 / ask 6.37 is pathological)",
+        "catalyst confirmation and source",
+        "relative volume",
+        "intraday range and open"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "SAIQ",
+      "action": "RESEARCH",
+      "thesis": "+100% IPO spike with no bid/ask in snapshot; cannot form an executable view without quote, float and lockup context. High-volatility event name.",
+      "bull_case": "IPO momentum continues if float is tight and demand persists into next session.",
+      "bear_case": "Post-IPO lockup/insider selling or profit-taking crushes price; extreme volatility, unknown spread.",
+      "missing_evidence": [
+        "bid/ask quote",
+        "IPO date, float and lockup schedule",
+        "day open and intraday path",
+        "relative volume"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "ATGL",
+      "action": "RESEARCH",
+      "thesis": "+52.6% but ~2.2k day volume and no quote — illiquid and unevaluable on the supplied data. Move may be a low-volume print artifact.",
+      "bull_case": "Volume and a real quote emerge at open, supporting continuation.",
+      "bear_case": "Illiquidity → wide/unreliable fills; move reverses on thin book.",
+      "missing_evidence": [
+        "bid/ask quote",
+        "consolidated volume confirmation",
+        "catalyst",
+        "spread"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "HOST",
+      "action": "RESEARCH",
+      "thesis": "+47.4% on ~81k volume, no quote, catalyst unknown. Thin book and unknown driver.",
+      "bull_case": "Catalyst is confirmed and volume expands → continuation.",
+      "bear_case": "Thin liquidity and unknown driver → likely fade or manipulation risk.",
+      "missing_evidence": [
+        "bid/ask quote",
+        "catalyst",
+        "relative volume",
+        "spread"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "WORX",
+      "action": "WAIT",
+      "thesis": "+36.6% with meaningful volume but 29.7% spread — unexecutable despite liquidity. Spread dominates the edge.",
+      "bull_case": "Spread compresses at open and catalyst confirms; then re-evaluate for continuation.",
+      "bear_case": "Wide spread persists → slippage; gap fade.",
+      "missing_evidence": [
+        "consolidated live quote",
+        "catalyst",
+        "intraday range"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "AIXI",
+      "action": "WAIT",
+      "thesis": "+40.9% but 30.2% spread; unexecutable regardless of momentum.",
+      "bull_case": "Spread tightens at open with sustained bid.",
+      "bear_case": "Wide spread persists; move reverses.",
+      "missing_evidence": [
+        "consolidated live quote",
+        "catalyst",
+        "relative volume"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "PRSO",
+      "action": "WAIT",
+      "thesis": "+54% but 27.1% spread and sub-$1 with unknown catalyst — pump-pattern risk. Price below $1 is not the sole exclusion; spread + no confirmed catalyst + pump signature are.",
+      "bull_case": "Real catalyst confirmed and spread tightens at open → speculative momentum continuation.",
+      "bear_case": "Pump-and-fade; wide spread; manipulation risk on sub-$1 name.",
+      "missing_evidence": [
+        "catalyst",
+        "consolidated live quote",
+        "float/outstanding shares",
+        "relative volume"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "SAFX",
+      "action": "RESEARCH",
+      "thesis": "$0.21, +32%, no bid/ask, unknown catalyst. Cannot assess without quote; low-price alone not exclusion but no data to build a thesis.",
+      "bull_case": "Unknown catalyst could be real; volume is present (~706k).",
+      "bear_case": "No quote, sub-$1, unknown driver → high manipulation/volatility risk.",
+      "missing_evidence": [
+        "bid/ask quote",
+        "catalyst",
+        "spread",
+        "float"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "FRTT",
+      "action": "RESEARCH",
+      "thesis": "Falling (-6.58%) penny on massive 208M volume with 28.2% spread — no momentum thesis, unexplained high-volume decline.",
+      "bull_case": "If a reversal catalyst emerges with tightening spread, a bounce is possible.",
+      "bear_case": "Declining penny with huge volume = distribution/manipulation risk.",
+      "missing_evidence": [
+        "catalyst",
+        "consolidated quote",
+        "why volume is 208M on a decline",
+        "short interest/float"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "NVDA",
+      "action": "RESEARCH",
+      "thesis": "Most-active AI/data-centre mega-cap but no price or change_pct in frozen snapshot — cannot assess momentum from supplied data.",
+      "bull_case": "AI-infrastructure leadership continues (durable theme).",
+      "bear_case": "Semis consolidation/chop noted historically; no data here to confirm direction.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread",
+        "intraday range"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "INTC",
+      "action": "RESEARCH",
+      "thesis": "Most-active but no price/change data supplied.",
+      "bull_case": "Turnaround/flow interest sustains.",
+      "bear_case": "No data to confirm; could be index-driven flow.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread",
+        "catalyst"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "CRWV",
+      "action": "RESEARCH",
+      "thesis": "Most-active AI/data-centre name but no price/change data supplied.",
+      "bull_case": "AI/data-centre theme flow continues.",
+      "bear_case": "Recently corrected hard (risk-off) per memory; direction unconfirmed here.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "IREN",
+      "action": "RESEARCH",
+      "thesis": "Most-active bitcoin miner but no price/change data supplied.",
+      "bull_case": "Bitcoin/AI-miner flow continues.",
+      "bear_case": "Recently corrected hard (risk-off); direction unconfirmed.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread"
+      ],
+      "evidence_tickers": [
+        "CIFR",
+        "CRWV"
+      ]
+    },
+    {
+      "ticker": "NU",
+      "action": "RESEARCH",
+      "thesis": "Most-active but no price/change data supplied.",
+      "bull_case": "Emerging-market fintech flow sustains.",
+      "bear_case": "No data to confirm direction.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread",
+        "catalyst"
+      ],
+      "evidence_tickers": []
+    },
+    {
+      "ticker": "BITO",
+      "action": "RESEARCH",
+      "thesis": "Most-active bitcoin ETF proxy but no price/change data supplied; direction tracks BTC.",
+      "bull_case": "Bitcoin strength lifts the ETF.",
+      "bear_case": "Bitcoin weakness drags it; no data here to confirm.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread",
+        "BTC reference price"
+      ],
+      "evidence_tickers": [
+        "BTC"
+      ]
+    },
+    {
+      "ticker": "SOXL",
+      "action": "RESEARCH",
+      "thesis": "Most-active leveraged semis ETF but no price/change data supplied. Leveraged alone is not the exclusion — absence of data is.",
+      "bull_case": "Semis rally → leveraged upside.",
+      "bear_case": "Leveraged decay/volatility drag; choppy semis environment.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread",
+        "underlying SOXX direction"
+      ],
+      "evidence_tickers": [
+        "SOXX"
+      ]
+    },
+    {
+      "ticker": "SOXS",
+      "action": "RESEARCH",
+      "thesis": "Most-active inverse leveraged semis ETF but no price/change data supplied.",
+      "bull_case": "Semis decline → inverse leveraged upside.",
+      "bear_case": "Inverse leveraged decay; wrong-way risk if semis rally.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread",
+        "underlying SOXX direction"
+      ],
+      "evidence_tickers": [
+        "SOXX"
+      ]
+    },
+    {
+      "ticker": "MSTZ",
+      "action": "RESEARCH",
+      "thesis": "Most-active leveraged inverse on MSTR but no price/change data supplied.",
+      "bull_case": "MSTR declines → inverse leveraged upside.",
+      "bear_case": "Inverse leveraged decay; wrong-way risk if MSTR rallies.",
+      "missing_evidence": [
+        "price",
+        "change_pct",
+        "spread",
+        "underlying MSTR direction"
+      ],
+      "evidence_tickers": [
+        "MSTR"
+      ]
+    },
+    {
+      "ticker": "AIMDW",
+      "action": "WAIT",
+      "thesis": "Warrant (suffix W) with stale quote (last 2026-10-12) and 74.4% spread — outside tradeable universe on instrument type, plus unreliable stale data. Not excluded merely on low price.",
+      "bull_case": "Underlying common rallies → warrant appreciates disproportionately.",
+      "bear_case": "Warrant-specific risk (expiry/dilution) + 74% spread + stale quote = no executable edge.",
+      "missing_evidence": [
+        "fresh quote (current is stale 2026-10-12)",
+        "underlying common ticker and price",
+        "warrant terms (strike/expiry)",
+        "consolidated spread"
+      ],
+      "evidence_tickers": []
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# WebUI scheduled-run observer / DeepSeek DEMO phase ledger
+
+**Scope:** Connect *existing* Open WebUI v0.12.3 OPEN/MIDDAY/CLOSE automations to the persistent `deepseek-phase.service` event, instruction and acknowledgement ledger without scheduling or invoking DeepSeek twice.
+
+The existing WebUI scheduler still runs the model and its 17 Trading 212 DEMO + 10 Alpaca tools. This adapter examines only **saved completed assistant runs** in the original WebUI database, checks the exact three existing automation IDs, owner/model/tool associations, assistant message completion, call-ID matched tool results, then emits one idempotent market-date phase event and stores one controller ACK for the corresponding run.
+
+The parser is executed by the authorised existing host service inside the already-running WebUI container using `docker exec`, under its read-only `file:...` SQLite connection. No chat/tool caller can provide owner claims or fabricate a run for ingestion. It returns metadata only: IDs, outcomes, tool names/counts; no chat content, keys, broker payloads, or orders.
+
+**Startup:** An explicit backed-up `python3 -m runtime.deepseek.service --db ... --migrate` while the service is stopped adds the two new ledger tables. The service initialises an immutable baseline timestamp to the latest existing WebUI run or current time, avoiding any historical replay. Every 25 seconds the existing worker checks for **new** completed saved runs, not for new trading signals. Same phase/date replays and second runs cannot cause duplicate controller instructions/ACKs.
+
+**Dynamic readiness:** The Contabo `runtime_status` operation returns `trading_ready=true` only after a *post-baseline* WebUI scheduled run produces a call-ID matched T212 function output that is linked to a persisted controller ACK within the previous 24 hours. This is a **DEMO scheduled-execution integration** indicator, not proof of a profitable trade, a filled broker order, or independently running a second market scheduler. LIVE remains disabled by the bridge. The `ModelInvocationGate` is intentionally unused because the WebUI scheduler already makes the authorised model invocation; making a second model call would risk duplicate trading.
+
+**Tests:** Four deterministic offline ledger tests and 392/392 repository tests passed on 20 October 2026 in the network-disabled WebUI v0.12.3 image. A live production **read-only** probe verified 32 historical run records across the three original automations and their model/owner/tool contracts; it issued no broker calls. The host must back up and migrate the controller database, restart the *existing* service once and verify non-executing status before the next legitimate CLOSE automation.
+
+**Operator rollback:** Preserve the prior `/home/katie/t212-runtime-service` commit and backed-up SQLite DB. Stop only `deepseek-phase.service`, restore the prior git revision and DB if a schema rollback is actually required, then restart. Do not touch WebUI's migrated database, Compose, the Contabo bridge service or the existing automation schedules.

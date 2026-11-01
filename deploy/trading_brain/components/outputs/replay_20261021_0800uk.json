@@ -1,0 +1,166 @@
+{
+  "dataset_id": "alpaca_eod_2026-10-20_20_symbol_user_supplied",
+  "evidence_sha256": "cbf27160ec376c2355729d1f1eeb05e6a30082128eff2c46b99fa617f32c49d1",
+  "model_calls_previous_trial": 9,
+  "model_calls_this_replay": 0,
+  "broker_orders_this_replay": 0,
+  "trades_executed_from_research": false,
+  "rows": [
+    {
+      "ticker": "BRZE",
+      "baseline_action": "WAIT",
+      "challenger_action": "HOLD",
+      "original_action_preserved": true,
+      "quote_costs_scenario_100_shares": {
+        "ticker": "BRZE",
+        "observation_only": true,
+        "quote_time_utc": null,
+        "freshness_verified": false,
+        "scenario_quantity": "100",
+        "bid": "45.5",
+        "ask": "45.56",
+        "roundtrip_spread_cost": "6.00",
+        "roundtrip_total_cost": "6.00",
+        "spread_pct_mid": 0.13178124313639358,
+        "quote_status": "OBSERVED_NOT_EXECUTABLE"
+      },
+      "momentum_from_available_bars": {
+        "as_of_utc": "2026-10-20T21:40:00+00:00",
+        "bars": 0,
+        "first_bar_utc": null,
+        "last_bar_utc": null,
+        "momentum_return_pct": null,
+        "volume_weighted_price": null,
+        "relative_volume": null,
+        "missing_inputs": [
+          "At least two timestamped bars",
+          "Non-zero volume for VWAP proxy",
+          "Historical comparable-volume baseline for RVOL"
+        ],
+        "not_an_executable_quote": true
+      },
+      "advisory_evidence_review": {
+        "ticker": "BRZE",
+        "action": "HOLD",
+        "quote_verified": false,
+        "catalyst_verified": false,
+        "flags": [
+          "missing_exchange",
+          "missing_rvol",
+          "missing_vwap",
+          "reported_spread_pct_0.13",
+          "review_spread_description"
+        ],
+        "research_only": true,
+        "action_changed": false
+      },
+      "model_reasoning_still_needs_independent_outcome_validation": true
+    },
+    {
+      "ticker": "MYGN",
+      "baseline_action": "WAIT",
+      "challenger_action": "BUY",
+      "original_action_preserved": true,
+      "quote_costs_scenario_100_shares": {
+        "ticker": "MYGN",
+        "observation_only": true,
+        "quote_time_utc": null,
+        "freshness_verified": false,
+        "scenario_quantity": "100",
+        "bid": "4.77",
+        "ask": "6.37",
+        "roundtrip_spread_cost": "160.00",
+        "roundtrip_total_cost": "160.00",
+        "spread_pct_mid": 28.725314183123878,
+        "quote_status": "OBSERVED_NOT_EXECUTABLE"
+      },
+      "momentum_from_available_bars": {
+        "as_of_utc": "2026-10-20T21:40:00+00:00",
+        "bars": 0,
+        "first_bar_utc": null,
+        "last_bar_utc": null,
+        "momentum_return_pct": null,
+        "volume_weighted_price": null,
+        "relative_volume": null,
+        "missing_inputs": [
+          "At least two timestamped bars",
+          "Non-zero volume for VWAP proxy",
+          "Historical comparable-volume baseline for RVOL"
+        ],
+        "not_an_executable_quote": true
+      },
+      "advisory_evidence_review": {
+        "ticker": "MYGN",
+        "action": "BUY",
+        "quote_verified": false,
+        "catalyst_verified": false,
+        "flags": [
+          "missing_exchange",
+          "missing_rvol",
+          "missing_vwap",
+          "reported_spread_pct_28.73",
+          "review_institutional_activity_claim",
+          "review_news_absence_claim",
+          "review_unsupported_intraday_claim",
+          "review_unverified_catalyst_claim"
+        ],
+        "research_only": true,
+        "action_changed": false
+      },
+      "model_reasoning_still_needs_independent_outcome_validation": true
+    },
+    {
+      "ticker": "PRSO",
+      "baseline_action": "WAIT",
+      "challenger_action": "HOLD",
+      "original_action_preserved": true,
+      "quote_costs_scenario_100_shares": {
+        "ticker": "PRSO",
+        "observation_only": true,
+        "quote_time_utc": null,
+        "freshness_verified": false,
+        "scenario_quantity": "100",
+        "bid": "0.51",
+        "ask": "0.67",
+        "roundtrip_spread_cost": "16.00",
+        "roundtrip_total_cost": "16.00",
+        "spread_pct_mid": 27.11864406779661,
+        "quote_status": "OBSERVED_NOT_EXECUTABLE"
+      },
+      "momentum_from_available_bars": {
+        "as_of_utc": "2026-10-20T21:40:00+00:00",
+        "bars": 0,
+        "first_bar_utc": null,
+        "last_bar_utc": null,
+        "momentum_return_pct": null,
+        "volume_weighted_price": null,
+        "relative_volume": null,
+        "missing_inputs": [
+          "At least two timestamped bars",
+          "Non-zero volume for VWAP proxy",
+          "Historical comparable-volume baseline for RVOL"
+        ],
+        "not_an_executable_quote": true
+      },
+      "advisory_evidence_review": {
+        "ticker": "PRSO",
+        "action": "HOLD",
+        "quote_verified": false,
+        "catalyst_verified": false,
+        "flags": [
+          "missing_exchange",
+          "missing_rvol",
+          "missing_vwap",
+          "reported_spread_pct_27.09",
+          "review_spread_description"
+        ],
+        "research_only": true,
+        "action_changed": false
+      },
+      "model_reasoning_still_needs_independent_outcome_validation": true
+    }
+  ],
+  "memory_decisions_visible_as_of": 3,
+  "memory_outcomes_visible_as_of": 0,
+  "not_a_live_market_signal": true
+}

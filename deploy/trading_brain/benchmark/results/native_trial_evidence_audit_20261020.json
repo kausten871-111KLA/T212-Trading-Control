@@ -1,0 +1,161 @@
+{
+  "dataset_id": "alpaca_eod_2026-10-20_20_symbol_user_supplied",
+  "evidence_sha256": "cbf27160ec376c2355729d1f1eeb05e6a30082128eff2c46b99fa617f32c49d1",
+  "evaluated_at_utc": "2026-10-20T22:43:30.421275+00:00",
+  "trial": {
+    "real_model_calls": 9,
+    "model": "deepseek/deepseek-chat",
+    "native_nodes": "Native TradingAgents bull/bear/trader nodes; NOT entire LangGraph graph",
+    "full_graph": false,
+    "paid_api_spend_verified": false,
+    "broker_orders": 0
+  },
+  "comparison": {
+    "baseline_assessed": 20,
+    "challenger_assessed": 3,
+    "overlap_count": 3,
+    "actions_changed": [
+      {
+        "ticker": "BRZE",
+        "baseline": "WAIT",
+        "challenger": "HOLD"
+      },
+      {
+        "ticker": "MYGN",
+        "baseline": "WAIT",
+        "challenger": "BUY"
+      },
+      {
+        "ticker": "PRSO",
+        "baseline": "WAIT",
+        "challenger": "HOLD"
+      }
+    ],
+    "only_baseline": [
+      "AIMDW",
+      "AIXI",
+      "ATGL",
+      "BITO",
+      "CRWV",
+      "FRTT",
+      "HOST",
+      "INTC",
+      "IREN",
+      "MSTZ",
+      "NU",
+      "NVDA",
+      "SAFX",
+      "SAIQ",
+      "SOXL",
+      "SOXS",
+      "WORX"
+    ],
+    "only_challenger": [],
+    "causal_improvement_proven": false,
+    "note": "This compares reasoning/coverage only. P&L requires subsequent market data and broker receipts."
+  },
+  "findings": [
+    {
+      "ticker": "BRZE",
+      "baseline_action": "WAIT",
+      "tradingagents_action": "HOLD",
+      "source_spread_pct": 0.13,
+      "source_stale_flag": false,
+      "matched_language_patterns": [],
+      "evidence_quality_flags": [
+        "catalyst_text_is_unverified_hypothesis",
+        "exchange_unverified",
+        "relative_volume_missing",
+        "reported_last_price_outside_bid_ask",
+        "vwap_missing"
+      ],
+      "quoted_execution_math_not_trade_result": {
+        "reported_last_price": 45.57,
+        "reported_bid": 45.5,
+        "reported_ask": 45.56,
+        "ask_above_reported_last_pct": -0.02,
+        "cross_spread_ask_to_bid_loss_pct": 0.13
+      }
+    },
+    {
+      "ticker": "MYGN",
+      "baseline_action": "WAIT",
+      "tradingagents_action": "BUY",
+      "source_spread_pct": 28.73,
+      "source_stale_flag": false,
+      "matched_language_patterns": [
+        {
+          "type": "unverified_institutional_flow",
+          "fragment": "institutional interest"
+        },
+        {
+          "type": "unverified_intraday_path",
+          "fragment": "intraday surge"
+        },
+        {
+          "type": "unverified_news_absence",
+          "fragment": "absence of negative news"
+        },
+        {
+          "type": "unsupported_bid_as_support",
+          "fragment": "bid price, representing a critical support level"
+        },
+        {
+          "type": "unverified_clinical_catalyst",
+          "fragment": "clinical data"
+        }
+      ],
+      "evidence_quality_flags": [
+        "absence_of_news_cannot_be_inferred",
+        "action_buy_sell_on_very_wide_reported_spread",
+        "action_buy_sell_without_verified_exchange",
+        "bid_price_does_not_establish_support",
+        "catalyst_text_is_unverified_hypothesis",
+        "exchange_unverified",
+        "illustrative_news_catalyst_not_verified",
+        "institutional_activity_not_supplied",
+        "intraday_path_not_supplied",
+        "quoted_spread_exceeds_20pct",
+        "relative_volume_missing",
+        "vwap_missing"
+      ],
+      "quoted_execution_math_not_trade_result": {
+        "reported_last_price": 5.54,
+        "reported_bid": 4.77,
+        "reported_ask": 6.37,
+        "ask_above_reported_last_pct": 14.98,
+        "cross_spread_ask_to_bid_loss_pct": 25.12
+      }
+    },
+    {
+      "ticker": "PRSO",
+      "baseline_action": "WAIT",
+      "tradingagents_action": "HOLD",
+      "source_spread_pct": 27.09,
+      "source_stale_flag": false,
+      "matched_language_patterns": [
+        {
+          "type": "spread_called_narrow",
+          "fragment": "relatively narrow spread"
+        }
+      ],
+      "evidence_quality_flags": [
+        "catalyst_text_is_unverified_hypothesis",
+        "exchange_unverified",
+        "language_calls_wide_spread_narrow",
+        "quoted_spread_exceeds_20pct",
+        "relative_volume_missing",
+        "vwap_missing"
+      ],
+      "quoted_execution_math_not_trade_result": {
+        "reported_last_price": 0.59,
+        "reported_bid": 0.51,
+        "reported_ask": 0.67,
+        "ask_above_reported_last_pct": 13.56,
+        "cross_spread_ask_to_bid_loss_pct": 23.88
+      }
+    }
+  ],
+  "conclusion": "Research comparison only. Flagged statements require evidence review. No trading performance improvement established.",
+  "automatic_strategy_restrictions_added": false
+}

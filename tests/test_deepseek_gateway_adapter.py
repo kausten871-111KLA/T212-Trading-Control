@@ -44,3 +44,13 @@ class GatewaySeamTests(unittest.TestCase):
         gateway=FakeGateway();adapter=ExistingDemoGateway(gateway)
         self.assertEqual(adapter.reconcile('i')['status'],'PENDING')
         self.assertEqual(gateway.calls[0][0],'reconcile_order_intent')
+    def test_reconcile_preserves_partial_fill_quantity(self):
+        gateway=FakeGateway()
+        async def reconcile_order_intent(**kwargs):
+            return {'intentId':'i','environment':'DEMO','liveTradingEnabled':False,
+                'state':'PARTIALLY_FILLED','brokerOrderId':123,
+                'brokerResponse':{'id':123,'filledQuantity':0.5,'averagePrice':10}}
+        gateway.reconcile_order_intent=reconcile_order_intent
+        result=ExistingDemoGateway(gateway).reconcile('i')
+        self.assertEqual(result['filled_qty'],0.5)
+        self.assertEqual(result['avg_price'],10)
