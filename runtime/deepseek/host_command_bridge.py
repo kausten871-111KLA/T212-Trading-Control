@@ -9,6 +9,7 @@ No model inference, broker orders, schedule edits or trade decisions here.
 import hmac
 import ipaddress
 import json
+import math
 import os
 from pathlib import Path
 import sqlite3
@@ -124,6 +125,14 @@ def _reject_nonfinite_constant(value):
     raise ValueError("Non-finite JSON constant")
 
 
+def _finite_json_float(token):
+    """Reject exponent-overflow JSON numbers that Python parses as Infinity."""
+    value = float(token)
+    if not math.isfinite(value):
+        raise ValueError("Non-finite JSON number")
+    return value
+
+
 def _unique_json_object(pairs):
     """Reject ambiguous duplicate keys at every JSON nesting level."""
     obj = {}
@@ -192,7 +201,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(413,{"ok":False,"error":"invalid_length"})
         try:
             payload=json.loads(self.rfile.read(length), object_pairs_hook=_unique_json_object,
-                               parse_constant=_reject_nonfinite_constant)
+                               parse_constant=_reject_nonfinite_constant,
+                               parse_float=_finite_json_float)
             if not isinstance(payload,dict):raise ValueError
             if model_task:
                 # The model-task contract has a flat payload of scalar fields.
