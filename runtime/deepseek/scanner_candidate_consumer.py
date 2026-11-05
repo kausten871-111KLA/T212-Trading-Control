@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS consumer_batch (
   lease_owner TEXT,
   lease_expires_utc TEXT,
   receipt_id TEXT,
+  investigator_receipt_id TEXT,
+  decision_receipt_id TEXT,
   last_error_type TEXT,
   created_at_utc TEXT NOT NULL,
   acknowledged_at_utc TEXT
@@ -107,6 +109,11 @@ class ScannerCandidateConsumer:
         self.db.execute("PRAGMA busy_timeout=15000")
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.executescript(SCHEMA)
+        # Forward-compatible additive migration for a ledger created by an earlier draft.
+        batch_columns = {row[1] for row in self.db.execute("PRAGMA table_info(consumer_batch)")}
+        for column in ("investigator_receipt_id", "decision_receipt_id"):
+            if column not in batch_columns:
+                self.db.execute(f"ALTER TABLE consumer_batch ADD COLUMN {column} TEXT")
         now = _stamp()
         self.db.execute(
             "INSERT OR IGNORE INTO consumer_state(consumer_name,cursor_id,updated_at_utc) "
@@ -296,14 +303,29 @@ class ScannerCandidateConsumer:
         *,
         batch_id: str,
         worker_id: str,
-        receipt_id: str,
+        investigator_receipt_id: str,
+        decision_receipt_id: str,
         candidate_ids: list[int],
         investigator_ack: bool,
         decision_ack: bool,
         now_utc: datetime | str | None = None,
     ) -> int:
-        if not receipt_id or investigator_ack is not True or decision_ack is not True:
-            raise ConsumerError("both INVESTIGATOR and DECISION receipts are required")
+        if (
+            not isinstance(investigator_receipt_id, str)
+            or not investigator_receipt_id.strip()
+            or len(investigator_receipt_id) > 200
+            or not isinstance(decision_receipt_id, str)
+            or not decision_receipt_id.strip()
+            or len(decision_receipt_id) > 200
+            or investigator_ack is not True
+            or decision_ack is not True
+        ):
+            raise ConsumerError("distinct INVESTIGATOR and DECISION receipts are required")
+        if (
+            not isinstance(candidate_ids, list)
+            or any(type(candidate_id) is not int or candidate_id < 1 for candidate_id in candidate_ids)
+        ):
+            raise ConsumerError("candidate IDs must be positive integers")
         now = _stamp(now_utc)
         try:
             self.db.execute("BEGIN IMMEDIATE")
@@ -326,9 +348,11 @@ class ScannerCandidateConsumer:
                 raise ConsumerError("cursor changed while batch was in flight")
             self.db.execute(
                 "UPDATE consumer_batch SET state='acknowledged',receipt_id=?,"
+                "investigator_receipt_id=?,decision_receipt_id=?,"
                 "lease_owner=NULL,lease_expires_utc=NULL,acknowledged_at_utc=? "
                 "WHERE batch_id=?",
-                (receipt_id, now, batch_id),
+                (f"investigator={investigator_receipt_id};decision={decision_receipt_id}",
+                 investigator_receipt_id, decision_receipt_id, now, batch_id),
             )
             self.db.execute(
                 "UPDATE consumer_state SET cursor_id=?,updated_at_utc=? WHERE consumer_name=?",
@@ -353,12 +377,14 @@ class ScannerCandidateConsumer:
         try:
             self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute(
-                "SELECT attempts,max_attempts FROM consumer_batch WHERE batch_id=? "
-                "AND consumer_name=? AND state='in_flight' AND lease_owner=?",
+                "SELECT attempts,max_attempts,lease_expires_utc FROM consumer_batch "
+                "WHERE batch_id=? AND consumer_name=? AND state='in_flight' AND lease_owner=?",
                 (batch_id, self.consumer_name, worker_id),
             ).fetchone()
             if row is None:
                 raise ConsumerError("batch lease not owned")
+            if row["lease_expires_utc"] is None or _utc(row["lease_expires_utc"]) <= now:
+                raise ConsumerError("batch lease expired")
             terminal = int(row["attempts"]) >= int(row["max_attempts"])
             wait = min(3600, 30 * (2 ** max(0, int(row["attempts"]) - 1)))
             next_try = _stamp(now + timedelta(seconds=wait))
