@@ -159,12 +159,18 @@ class ScannerCandidateConsumer:
         if self.cursor() != requested_cursor:
             raise ConsumerError("stale cursor; reload persisted cursor")
         if not records:
-            with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            try:
                 self.db.execute(
                     "UPDATE consumer_state SET last_poll_utc=?,updated_at_utc=? "
                     "WHERE consumer_name=?",
                     (now, now, self.consumer_name),
                 )
+                self.db.execute("COMMIT")
+            except Exception:
+                if self.db.in_transaction:
+                    self.db.execute("ROLLBACK")
+                raise
             return None
         ids = []
         for record in records:
@@ -187,11 +193,13 @@ class ScannerCandidateConsumer:
         payload = {"batch_id": batch_id, "cursor_before": requested_cursor,
                    "cursor_after": next_cursor, "max_id_at_read": max_id,
                    "candidate_ids": ids, "records": records}
-        with self.db:
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
             old = self.db.execute(
                 "SELECT batch_id FROM consumer_batch WHERE batch_id=?", (batch_id,)
             ).fetchone()
             if old:
+                self.db.execute("COMMIT")
                 return batch_id
             self.db.execute(
                 "INSERT INTO consumer_batch(batch_id,consumer_name,cursor_before,"
@@ -205,6 +213,11 @@ class ScannerCandidateConsumer:
                 "WHERE consumer_name=?",
                 (now, now, self.consumer_name),
             )
+            self.db.execute("COMMIT")
+        except Exception:
+            if self.db.in_transaction:
+                self.db.execute("ROLLBACK")
+            raise
         return batch_id
 
     def pending_batch(self, *, now_utc: datetime | str | None = None) -> dict[str, Any] | None:
