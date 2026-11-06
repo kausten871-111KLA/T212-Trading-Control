@@ -30,19 +30,26 @@ class Tools:
         self,
         command: Literal[
             "runtime_status", "webui_health", "open_acceptance",
-            "repo_revision", "data_key_status", "alpha_vantage_daily"
+            "repo_revision", "data_key_status", "alpha_vantage_daily",
+            "scanner_candidates", "scanner_health"
         ] = "runtime_status",
         symbol: str = "IBM",
+        cursor: int = -1,
+        limit: int = 5,
     ) -> str:
         """Invoke one predefined Contabo operation and return verified host output.
 
         :param command: Select runtime_status, webui_health, open_acceptance, repo_revision,
-        data_key_status or alpha_vantage_daily. No free-form shell or orders.
-        :param symbol: Market symbol, e.g. IBM or TSCO.LON, for alpha_vantage_daily only.
+        data_key_status, alpha_vantage_daily, scanner_candidates or scanner_health.
+        No free-form shell or orders.
+        :param symbol: Market symbol for alpha_vantage_daily only.
+        :param cursor: Last acknowledged scanner event ID; -1 starts at newest.
+        :param limit: Candidate page size, capped to 12 by the host.
         """
         permitted = {
             "runtime_status", "webui_health", "open_acceptance",
-            "repo_revision", "data_key_status", "alpha_vantage_daily"
+            "repo_revision", "data_key_status", "alpha_vantage_daily",
+            "scanner_candidates", "scanner_health"
         }
         if command not in permitted:
             return json.dumps({"ok": False, "error": "command_not_allowed"})
@@ -56,7 +63,8 @@ class Tools:
             async with httpx.AsyncClient(timeout=45, trust_env=False, transport=httpx.AsyncHTTPTransport(uds=url)) as client:
                 response = await client.post(
                     "http://localhost/command",
-                    json={"command": command, "symbol": symbol},
+                    json={"command": command, "symbol": symbol,
+                          "cursor": cursor, "limit": limit},
                     headers={"X-Bridge-Token": token, "Accept": "application/json"},
                 )
                 return response.text[:15000] if response.status_code == 200 else json.dumps(
