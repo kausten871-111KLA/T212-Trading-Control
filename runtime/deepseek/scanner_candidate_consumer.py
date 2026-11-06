@@ -11,7 +11,7 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
-from typing import Any, Mapping
+from typing import Any, Mapping, Callable
 
 DEFAULT_DB = Path("/home/katie/.local/state/deepseek-runtime/scanner_consumer.sqlite3")
 DEFAULT_CONSUMER = "market-scanner-investigator"
@@ -52,6 +52,15 @@ CREATE TABLE IF NOT EXISTS model_call_budget (
   utc_date TEXT PRIMARY KEY,
   calls_reserved INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS consumer_stage_receipt (
+  batch_id TEXT NOT NULL,
+  stage TEXT NOT NULL CHECK(stage IN ('INVESTIGATOR','DECISION')),
+  receipt_id TEXT NOT NULL,
+  evidence_json TEXT NOT NULL,
+  verified_at_utc TEXT NOT NULL,
+  PRIMARY KEY(batch_id,stage),
+  UNIQUE(receipt_id)
+);
 """
 
 class ConsumerError(ValueError):
@@ -89,6 +98,7 @@ class ScannerCandidateConsumer:
         poll_seconds: int = DEFAULT_POLL_SECONDS,
         batch_size: int = DEFAULT_BATCH_SIZE,
         max_attempts: int = 3,
+        receipt_lookup: Callable[..., Mapping[str, Any] | None] | None = None,
     ):
         if not consumer_name or len(consumer_name) > 100:
             raise ConsumerError("invalid consumer_name")
@@ -104,6 +114,11 @@ class ScannerCandidateConsumer:
         self.poll_seconds = poll_seconds
         self.batch_size = batch_size
         self.max_attempts = max_attempts
+        if receipt_lookup is not None and not callable(receipt_lookup):
+            raise ConsumerError("receipt_lookup must be a trusted host callable")
+        # Deliberately absent by default; the model cannot provide this verifier.
+        # Deployment must bind it to an independent authenticated WebUI receipt store.
+        self.receipt_lookup = receipt_lookup
         self.db = sqlite3.connect(str(self.path), isolation_level=None, timeout=15)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA busy_timeout=15000")
@@ -202,12 +217,28 @@ class ScannerCandidateConsumer:
                    "candidate_ids": ids, "records": records}
         self.db.execute("BEGIN IMMEDIATE")
         try:
+            # The earlier optimistic cursor check can race another worker's
+            # acknowledgement. Recheck under the same write transaction.
+            committed_cursor = self.db.execute(
+                "SELECT cursor_id FROM consumer_state WHERE consumer_name=?",
+                (self.consumer_name,),
+            ).fetchone()
+            if committed_cursor is None or int(committed_cursor[0]) != requested_cursor:
+                raise ConsumerError("cursor moved before page staging")
             old = self.db.execute(
                 "SELECT batch_id FROM consumer_batch WHERE batch_id=?", (batch_id,)
             ).fetchone()
             if old:
                 self.db.execute("COMMIT")
                 return batch_id
+            # A still-unacknowledged page cannot be silently replaced by a
+            # newer bootstrap page or a different sample at the same cursor.
+            outstanding = self.db.execute(
+                "SELECT batch_id FROM consumer_batch WHERE consumer_name=? "
+                "AND state!='acknowledged' LIMIT 1", (self.consumer_name,)
+            ).fetchone()
+            if outstanding:
+                raise ConsumerError("unacknowledged batch must be resolved first")
             self.db.execute(
                 "INSERT INTO consumer_batch(batch_id,consumer_name,cursor_before,"
                 "cursor_after,candidate_ids_json,payload_json,state,max_attempts,created_at_utc) "
@@ -265,7 +296,17 @@ class ScannerCandidateConsumer:
                 "ORDER BY created_at_utc,batch_id LIMIT 1",
                 (self.consumer_name, now_s, now_s),
             ).fetchone()
-            if row is None or row["attempts"] >= row["max_attempts"]:
+            if row is None:
+                self.db.execute("COMMIT")
+                return None
+            if row["attempts"] >= row["max_attempts"]:
+                # Expired terminal claims cannot be reclaimed indefinitely;
+                # do not silently bury exhausted work as an in-flight lease.
+                self.db.execute(
+                    "UPDATE consumer_batch SET state='failed',lease_owner=NULL,"
+                    "lease_expires_utc=NULL,last_error_type='attempts_exhausted' "
+                    "WHERE batch_id=?", (row["batch_id"],)
+                )
                 self.db.execute("COMMIT")
                 return None
             self.db.execute(
@@ -298,6 +339,84 @@ class ScannerCandidateConsumer:
                 self.db.execute("ROLLBACK")
             raise
 
+    def record_verified_stage(
+        self,
+        *,
+        batch_id: str,
+        worker_id: str,
+        stage: str,
+        receipt_id: str,
+        candidate_ids: list[int],
+        now_utc: datetime | str | None = None,
+    ) -> bool:
+        """Persist one independently retrieved WebUI terminal receipt.
+
+        The trusted host must inject receipt_lookup. Untrusted model-provided
+        booleans, chat text or fabricated receipt IDs are NOT authoritative.
+        There is deliberately no default WebUI API client or model invocation.
+        """
+        if stage not in ("INVESTIGATOR", "DECISION"):
+            raise ConsumerError("invalid stage")
+        if not isinstance(receipt_id, str) or not receipt_id.strip() or len(receipt_id) > 200:
+            raise ConsumerError("invalid receipt ID")
+        if not callable(self.receipt_lookup):
+            raise ConsumerError("authenticated WebUI receipt lookup not installed")
+        if not isinstance(candidate_ids, list) or not candidate_ids or any(
+            type(candidate_id) is not int or candidate_id < 1 for candidate_id in candidate_ids
+        ):
+            raise ConsumerError("invalid candidate IDs")
+        now = _utc(now_utc)
+        # Independent host lookup takes place outside the ledger write lock.
+        # On commit we recheck the batch, owner, lease, candidate set and order.
+        proof = self.receipt_lookup(stage=stage, receipt_id=receipt_id)
+        if not isinstance(proof, Mapping) or any((
+            proof.get("source") != "authenticated_webui_host_terminal",
+            proof.get("receipt_id") != receipt_id,
+            proof.get("stage") != stage,
+            proof.get("batch_id") != batch_id,
+            proof.get("candidate_ids") != candidate_ids,
+            proof.get("terminal") != "completed",
+        )):
+            raise ConsumerError("independent authenticated stage receipt not verified")
+        evidence = _canonical(dict(proof))
+        try:
+            self.db.execute("BEGIN IMMEDIATE")
+            row = self.db.execute(
+                "SELECT * FROM consumer_batch WHERE batch_id=? AND consumer_name=?",
+                (batch_id, self.consumer_name),
+            ).fetchone()
+            if row is None or row["state"] != "in_flight" or row["lease_owner"] != worker_id:
+                raise ConsumerError("stage receipt has no active owned batch")
+            if _utc(row["lease_expires_utc"]) <= now:
+                raise ConsumerError("batch lease expired")
+            if json.loads(row["candidate_ids_json"]) != candidate_ids:
+                raise ConsumerError("stage receipt candidate set mismatch")
+            prior = dict(self.db.execute(
+                "SELECT stage,receipt_id FROM consumer_stage_receipt WHERE batch_id=?",
+                (batch_id,),
+            ).fetchall())
+            if stage == "DECISION" and not prior.get("INVESTIGATOR"):
+                raise ConsumerError("INVESTIGATOR completion must precede DECISION")
+            if stage == "DECISION" and prior.get("INVESTIGATOR") == receipt_id:
+                raise ConsumerError("INVESTIGATOR and DECISION receipts must be distinct")
+            if stage in prior:
+                if prior[stage] != receipt_id:
+                    raise ConsumerError("conflicting stage receipt")
+                self.db.execute("COMMIT")
+                return False
+            self.db.execute(
+                "INSERT INTO consumer_stage_receipt("
+                "batch_id,stage,receipt_id,evidence_json,verified_at_utc) "
+                "VALUES(?,?,?,?,?)",
+                (batch_id,stage,receipt_id,evidence,_stamp(now)),
+            )
+            self.db.execute("COMMIT")
+            return True
+        except Exception:
+            if self.db.in_transaction:
+                self.db.execute("ROLLBACK")
+            raise
+
     def acknowledge(
         self,
         *,
@@ -319,6 +438,7 @@ class ScannerCandidateConsumer:
             or len(decision_receipt_id) > 200
             or investigator_ack is not True
             or decision_ack is not True
+            or investigator_receipt_id == decision_receipt_id
         ):
             raise ConsumerError("distinct INVESTIGATOR and DECISION receipts are required")
         if (
@@ -340,6 +460,13 @@ class ScannerCandidateConsumer:
             expected = json.loads(row["candidate_ids_json"])
             if candidate_ids != expected:
                 raise ConsumerError("ack must cover every candidate in the batch")
+            proven = dict(self.db.execute(
+                "SELECT stage,receipt_id FROM consumer_stage_receipt WHERE batch_id=?",
+                (batch_id,),
+            ).fetchall())
+            if proven != {"INVESTIGATOR": investigator_receipt_id,
+                           "DECISION": decision_receipt_id}:
+                raise ConsumerError("two independently verified persisted stage receipts required")
             state = self.db.execute(
                 "SELECT cursor_id FROM consumer_state WHERE consumer_name=?",
                 (self.consumer_name,),
@@ -410,5 +537,12 @@ class ScannerCandidateConsumer:
             "SELECT state,count(*) FROM consumer_batch WHERE consumer_name=? GROUP BY state",
             (self.consumer_name,),
         ).fetchall())
+        stage_counts = dict(self.db.execute(
+            "SELECT stage,count(*) FROM consumer_stage_receipt "
+            "WHERE batch_id IN (SELECT batch_id FROM consumer_batch "
+            "WHERE consumer_name=?) GROUP BY stage",
+            (self.consumer_name,),
+        ).fetchall())
         return {"consumer": self.consumer_name, "cursor_id": int(state["cursor_id"]),
-                "last_poll_utc": state["last_poll_utc"], "batch_counts": counts}
+                "last_poll_utc": state["last_poll_utc"], "batch_counts": counts,
+                "stage_receipt_counts": stage_counts}

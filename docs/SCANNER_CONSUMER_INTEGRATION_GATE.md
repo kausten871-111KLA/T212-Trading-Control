@@ -26,3 +26,7 @@ This note records the remaining integration work for the scanner candidate consu
 ## Current code boundary
 
 `runtime/deepseek/scanner_candidate_consumer.py` supplies the durable ledger and contracts only. It does not fetch candidates, decide eligibility, invoke DeepSeek, create schedules, or call a broker. Do not describe the scanner-to-INVESTIGATOR-to-DECISION handoff as complete until independent receipts and cursor advancement are observed in the persistent ledger.
+
+## Bounded review addendum (6 November 2026)
+
+See SCANNER_P1_REVIEW_20261106.md for exact source hashes, reviewed read-only scanner/bridge snapshot, the explicitly missing authoritative WebUI INV/DEC receipt path, staged fail-closed dual receipt persistence and eight offline synthetic tests. The staged branch remains unmerged and undeployed. The consumer has a zero default model-call budget and may not advance the production scanner cursor until genuine stage evidence is proven.

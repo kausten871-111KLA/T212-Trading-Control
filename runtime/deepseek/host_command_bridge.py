@@ -30,7 +30,8 @@ NETWORK = ipaddress.ip_network("172.18.0.0/16")
 COMMANDS = frozenset({"runtime_status","webui_health","open_acceptance",
                        "repo_revision","data_key_status","alpha_vantage_daily",
                        "twelve_data_quote","twelve_data_series",
-                       "twelve_data_search","twelve_data_usage"})
+                       "twelve_data_search","twelve_data_usage",
+                       "scanner_candidates","scanner_health"})
 
 def _run(args, timeout=8):
     p = subprocess.run(args, capture_output=True, text=True, timeout=timeout,
@@ -59,9 +60,15 @@ def _verified_demo_schedule_ready():
 
 
 def execute(command, symbol="IBM", exchange="", mic_code="", interval="1day",
-            outputsize=30):
+            outputsize=30, cursor=-1, limit=5):
     if not isinstance(command, str) or command not in COMMANDS:
         return {"ok": False, "error": "unknown_command", "allowed_commands": sorted(COMMANDS)}
+    if command == "scanner_candidates":
+        from .scanner_read_commands import scanner_candidates
+        return scanner_candidates(cursor=cursor, limit=limit)
+    if command == "scanner_health":
+        from .scanner_read_commands import scanner_health
+        return scanner_health()
     if command.startswith("twelve_data_"):
         from .twelve_data_adapter import query
         operation = {
@@ -226,6 +233,8 @@ class Handler(BaseHTTPRequestHandler):
                 mic_code=payload.get("mic_code", ""),
                 interval=payload.get("interval", "1day"),
                 outputsize=payload.get("outputsize", 30),
+                cursor=payload.get("cursor", -1),
+                limit=payload.get("limit", 5),
             ))
         except (PermissionError, ValueError) as error:
             return self.respond(403 if isinstance(error,PermissionError) else 400,
