@@ -226,9 +226,16 @@ class ScannerCandidateConsumer:
             if committed_cursor is None or int(committed_cursor[0]) != requested_cursor:
                 raise ConsumerError("cursor moved before page staging")
             old = self.db.execute(
-                "SELECT batch_id FROM consumer_batch WHERE batch_id=?", (batch_id,)
+                "SELECT batch_id,payload_json FROM consumer_batch WHERE batch_id=?",
+                (batch_id,),
             ).fetchone()
             if old:
+                # Batch IDs bind the cursor and candidate IDs. An exact replay
+                # is idempotent, but changed evidence under the same IDs must
+                # not silently pass as the original immutable staged page.
+                saved = json.loads(old["payload_json"])
+                if saved.get("records") != records:
+                    raise ConsumerError("candidate evidence changed for an existing batch")
                 self.db.execute("COMMIT")
                 return batch_id
             # A still-unacknowledged page cannot be silently replaced by a
